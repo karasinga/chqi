@@ -1,5 +1,7 @@
 from django.db import models
 import os
+from django.conf import settings
+
 
 class Project(models.Model):
     name = models.CharField(max_length=255)
@@ -41,7 +43,17 @@ class FileFolder(models.Model):
             'id': self.id,
             'name': self.name,
             'children': [child.get_tree() for child in self.children.all()],
-            'files': [{'id': f.id, 'name': os.path.basename(f.file.name), 'file_type': f.file_type, 'file_size': f.file_size} for f in self.files.all()]
+            'files': [
+                {
+                    'id': f.id,
+                    'name': os.path.basename(f.file.name),
+                    'file_type': f.file_type,
+                    'file_size': f.file_size,
+                    'uploaded_at': f.uploaded_at,
+                    'uploaded_by': f.uploaded_by_id,
+                    'uploader_name': f.uploaded_by.get_full_name() or f.uploaded_by.username if f.uploaded_by else 'Unknown'
+                } for f in self.files.all()
+            ]
         }
 
 class ProjectFile(models.Model):
@@ -61,6 +73,7 @@ class ProjectFile(models.Model):
     file = models.FileField(upload_to='project_files/')
     file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES, default='other')
     file_size = models.BigIntegerField(default=0)  # in bytes
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='uploaded_files')
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

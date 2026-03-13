@@ -1,21 +1,25 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import {
-    Typography, Box, Tabs, Tab, Button, IconButton, Paper, Grid, Card, CardContent, CardHeader, Divider, Chip,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    ToggleButton, ToggleButtonGroup, Tooltip, Avatar, Stack,
-    Menu, MenuItem
+    Typography, Box, Tabs, Tab, Button, IconButton, Paper, Grid, Card,
+    CardContent, CardHeader, Divider, Chip, Table, TableBody, TableCell,
+    TableContainer, TableHead, TableRow, ToggleButton, ToggleButtonGroup,
+    Tooltip, Avatar, Stack, Menu, MenuItem, CircularProgress, alpha,
+    useMediaQuery, useTheme
 } from '@mui/material';
 import {
-    Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon, Upload as UploadIcon,
-    CalendarMonth as CalendarIcon, ViewWeek as WeekIcon, ViewDay as DayIcon,
-    CalendarToday as YearIcon, Timer as TimerIcon, Warning as WarningIcon,
-    TrendingUp as TrendingUpIcon, AccountTree as AccountTreeIcon,
-    ArrowForward as ArrowForwardIcon, InfoOutlined as InfoIcon,
-    Download as DownloadIcon
+    Add as AddIcon,
+    CalendarMonth as CalendarIcon,
+    ViewWeek as WeekIcon, ViewDay as DayIcon,
+    CalendarToday as YearIcon, Timer as TimerIcon,
+    Warning as WarningIcon, TrendingUp as TrendingUpIcon,
+    AccountTree as AccountTreeIcon, ArrowForward as ArrowForwardIcon,
+    InfoOutlined as InfoIcon, Download as DownloadIcon,
+    Refresh as RefreshIcon, Fullscreen as FullscreenIcon,
+    FullscreenExit as FullscreenExitIcon
 } from '@mui/icons-material';
-import { toPng } from 'html-to-image';
+import { toBlob } from 'html-to-image';
 import { Gantt, ViewMode } from 'gantt-task-react';
 import "gantt-task-react/dist/index.css";
 import TaskForm from '../components/TaskForm';
@@ -28,85 +32,263 @@ import TeamTab from '../components/TeamTab';
 import MilestonesTab from '../components/MilestonesTab';
 import BudgetTab from '../components/BudgetTab';
 
+// ─────────────────────────────────────────────────────────────────
+// DESIGN TOKENS — Single source of truth for the entire component
+// Brand palette: #1BACA7 (Teal) / #182F5B (Navy) / #B1AFB2 (Gray)
+// ─────────────────────────────────────────────────────────────────
+const tokens = {
+    color: {
+        // Brand primaries
+        primary: '#182F5B',
+        primaryLight: '#2a4a80',
+        primaryDark: '#0f1f3d',
+        accent: '#1BACA7',
+        accentLight: '#23d4cd',
+        accentDark: '#148a86',
+        neutral: '#B1AFB2',
+        neutralLight: '#d4d3d5',
+        neutralLighter: '#f0eff0',
+        neutralDark: '#8a888b',
+
+        // Semantic
+        critical: '#c62828',
+        criticalLight: '#fca5a5',
+        criticalBg: '#fef2f2',
+        criticalBorder: '#fecaca',
+        warning: '#e65100',
+        warningBg: '#fff8f0',
+        warningBorder: '#ffcc80',
+        lateSchedule: '#f59e0b',
+        successBg: '#f0faf9',
+        successBorder: '#b2dfdb',
+
+        // Surfaces
+        background: '#fafbfc',
+        surface: '#ffffff',
+        surfaceHover: '#f8f9fa',
+        text: '#1a1a2e',
+        textSecondary: '#64648c',
+        textMuted: '#9e9eb8',
+    },
+    radius: {
+        sm: 2,
+        md: 4,
+        lg: 6,
+    },
+    weight: {
+        normal: 500,
+        semibold: 600,
+        bold: 700,
+    },
+    shadow: {
+        sm: '0 1px 3px rgba(24,47,91,0.06), 0 1px 2px rgba(24,47,91,0.04)',
+        md: '0 4px 12px rgba(24,47,91,0.08), 0 2px 4px rgba(24,47,91,0.04)',
+        lg: '0 8px 24px rgba(24,47,91,0.10), 0 4px 8px rgba(24,47,91,0.06)',
+    },
+    transition: {
+        fast: 'all 0.15s ease',
+        normal: 'all 0.25s ease',
+    },
+};
+
+// ─────────────────────────────────────────────────────────────────
+// STATIC CONSTANTS — Defined outside component to prevent re-allocation
+// ─────────────────────────────────────────────────────────────────
+const TAB_LABELS = [
+    'Overview',
+    'Tasks',
+    'Timeline & Analysis',
+    'Network Diagram',
+    'Team',
+    'Milestones',
+    'Budget',
+    'Analytics',
+    'Files',
+];
+
+const CPM_COLUMNS = [
+    { label: 'Task Name', align: 'left', color: null },
+    { label: 'Duration', align: 'center', color: null },
+    { label: 'ES', align: 'center', color: tokens.color.accent },
+    { label: 'EF', align: 'center', color: tokens.color.accent },
+    { label: 'LS', align: 'center', color: tokens.color.lateSchedule },
+    { label: 'LF', align: 'center', color: tokens.color.lateSchedule },
+    { label: 'Float', align: 'center', color: null },
+    { label: 'Status', align: 'center', color: null },
+];
+
+const EXPORT_ITEMS = [
+    { label: 'Gantt Chart', file: 'gantt-chart', tab: 2, refKey: 'gantt' },
+    { label: 'Network Diagram', file: 'network-diagram', tab: 3, refKey: 'network' },
+    { label: 'CPM Analysis', file: 'cpm-analysis', tab: 2, refKey: 'cpm' },
+    { label: 'Task Repository', file: 'task-repository', tab: 1, refKey: 'taskGrid' },
+];
+
+// ─────────────────────────────────────────────────────────────────
+// GANTT CSS OVERRIDES — Uses design tokens
+// ─────────────────────────────────────────────────────────────────
 const ganttStyles = `
-  /* Main Container Wrapper */
   .gantt-chart-wrapper {
-    background-color: #ffffff !important;
+    background-color: ${tokens.color.surface} !important;
   }
-
-  /* Fix for the black background in the SVG area */
   .gantt-chart-wrapper svg {
-    background-color: #ffffff !important;
-    fill: #ffffff !important; /* Force base fill to white */
+    background-color: ${tokens.color.surface} !important;
   }
-
-  /* Target background rects specifically */
   .gantt-chart-wrapper rect:not([height="30"]):not([class*="bar"]) {
-    fill: #ffffff !important;
+    fill: ${tokens.color.surface} !important;
   }
-
-  /* Header Styling */
-  .gantt-chart-wrapper [class*="calendar"],
-  .gantt-chart-wrapper .calendar {
-    fill: #f8f9fa !important;
-  }
-
   .gantt-chart-wrapper [class*="calendar"] rect,
   .gantt-chart-wrapper .calendar rect {
-    fill: #f8f9fa !important;
-    stroke: #e0e0e0 !important;
+    fill: ${tokens.color.neutralLighter} !important;
+    stroke: ${tokens.color.neutralLight} !important;
   }
-
   .gantt-chart-wrapper [class*="calendar"] text,
   .gantt-chart-wrapper .calendar text {
-    fill: #3c4043 !important;
-    font-weight: 800 !important;
+    fill: ${tokens.color.primary} !important;
+    font-weight: ${tokens.weight.bold} !important;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     font-size: 11px;
-    dominant-baseline: middle;
   }
-
-  /* Grid Lines */
   .gantt-chart-wrapper line {
-    stroke: #f1f3f4 !important;
+    stroke: ${tokens.color.neutralLighter} !important;
   }
-
-  /* Task List (Left Side) */
   .gantt-chart-wrapper div:first-child:not(svg) {
-    background-color: #ffffff !important;
-    border-right: 1px solid #e0e0e0 !important;
+    background-color: ${tokens.color.surface} !important;
+    border-right: 1px solid ${tokens.color.neutralLight} !important;
   }
-
   .gantt-chart-wrapper div:first-child:not(svg) div {
-    border-bottom: 1px solid #f1f3f4 !important;
-    color: #3c4043 !important;
-    font-weight: 500 !important;
+    border-bottom: 1px solid ${tokens.color.neutralLighter} !important;
+    color: ${tokens.color.text} !important;
+    font-weight: ${tokens.weight.normal} !important;
   }
-
-  /* Bar Hover Effects */
   .bar-wrapper:hover .bar-main {
-    filter: brightness(0.95);
+    filter: brightness(0.92);
     cursor: pointer;
   }
-
-  /* Ensure the today line is visible but subtle */
   .gantt-chart-wrapper .today {
-    fill: rgba(25, 118, 210, 0.05) !important;
+    fill: ${alpha(tokens.color.accent, 0.08)} !important;
   }
-
-  /* Ensure task names in bars are visible */
   .gantt-chart-wrapper text[class*="bar"] {
-    fill: #ffffff !important;
-    font-weight: 600 !important;
+    fill: ${tokens.color.surface} !important;
+    font-weight: ${tokens.weight.semibold} !important;
   }
 `;
 
+// ─────────────────────────────────────────────────────────────────
+// FULLSCREEN STYLES — For Analytics iframe
+// ─────────────────────────────────────────────────────────────────
+const fullscreenStyles = `
+  .analytics-fullscreen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    background: ${tokens.color.surface} !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+  
+  .analytics-fullscreen iframe {
+    width: 100% !important;
+    height: calc(100vh - 48px) !important;
+  }
+  
+  .analytics-fullscreen .fullscreen-header {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: ${tokens.color.neutralLighter};
+    border-bottom: 1px solid ${tokens.color.neutralLight};
+  }
+`;
+
+// ─────────────────────────────────────────────────────────────────
+// REUSABLE SUB-COMPONENTS
+// ─────────────────────────────────────────────────────────────────
+const StatCard = ({ icon, iconBg, label, value, bgColor, borderColor }) => (
+    <Paper
+        variant="outlined"
+        sx={{
+            p: 2.5,
+            borderRadius: tokens.radius.md,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            bgcolor: bgColor,
+            border: `1px solid ${borderColor}`,
+            transition: tokens.transition.fast,
+            '&:hover': {
+                boxShadow: tokens.shadow.sm,
+                transform: 'translateY(-1px)',
+            },
+        }}
+    >
+        <Avatar sx={{ bgcolor: iconBg, width: 44, height: 44 }}>
+            {icon}
+        </Avatar>
+        <Box>
+            <Typography
+                variant="caption"
+                sx={{
+                    fontWeight: tokens.weight.bold,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    color: tokens.color.textSecondary,
+                    fontSize: '0.675rem',
+                }}
+            >
+                {label}
+            </Typography>
+            <Typography
+                variant="h5"
+                sx={{
+                    fontWeight: tokens.weight.bold,
+                    color: tokens.color.text,
+                    lineHeight: 1.2,
+                }}
+            >
+                {value}
+            </Typography>
+        </Box>
+    </Paper>
+);
+
+const SectionCard = ({ children, sx, ...props }) => (
+    <Card
+        elevation={0}
+        sx={{
+            borderRadius: tokens.radius.lg,
+            border: `1px solid ${tokens.color.neutralLight}`,
+            boxShadow: tokens.shadow.sm,
+            overflow: 'hidden',
+            transition: tokens.transition.normal,
+            '&:hover': { boxShadow: tokens.shadow.md },
+            ...sx,
+        }}
+        {...props}
+    >
+        {children}
+    </Card>
+);
+
+// ─────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────
 const ProjectDetails = () => {
     const { id } = useParams();
     const queryClient = useQueryClient();
+    const muiTheme = useTheme();
+    const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
-    // UI state
+    // ─── UI State ────────────────────────────────────────────────
     const [tab, setTab] = useState(0);
     const [openTaskForm, setOpenTaskForm] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
@@ -114,41 +296,55 @@ const ProjectDetails = () => {
     const [fullView, setFullView] = useState(false);
     const [downloadAnchor, setDownloadAnchor] = useState(null);
     const [analyticsKey, setAnalyticsKey] = useState(0);
+    const [analyticsFullscreen, setAnalyticsFullscreen] = useState(false);
+    const [networkLegendVisible, setNetworkLegendVisible] = useState(true);
     const [taskToDelete, setTaskToDelete] = useState(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // Queries
-    const { data: project } = useQuery({
+    // ─── Refs ────────────────────────────────────────────────────
+    const refs = {
+        gantt: useRef(null),
+        cpm: useRef(null),
+        taskGrid: useRef(null),
+        network: useRef(null),
+    };
+
+    // ─── Queries ─────────────────────────────────────────────────
+    const {
+        data: project,
+        isLoading: projectLoading,
+        error: projectError,
+    } = useQuery({
         queryKey: ['project', id],
         queryFn: () => api.get(`/projects/${id}/`),
-        enabled: !!id
+        enabled: !!id,
     });
 
-    const { data: rawTasks = [], isLoading: tasksLoading } = useQuery({
+    const { data: rawTasks = [] } = useQuery({
         queryKey: ['projectTasks', id],
         queryFn: () => api.get(`/pm/tasks/critical_path/?project_id=${id}`),
-        enabled: !!id
+        enabled: !!id,
     });
 
     const { data: users = [] } = useQuery({
         queryKey: ['users'],
-        queryFn: () => api.get('/users/users/')
+        queryFn: () => api.get('/users/users/'),
     });
 
     const cpmData = rawTasks;
 
-    // Memoized gantt tasks
+    // ─── Gantt Task Mapping (Brand Colors) ───────────────────────
     const tasks = useMemo(() => {
         if (!rawTasks.length) return [];
-        return rawTasks.map(t => {
+        return rawTasks.map((t) => {
             const start = new Date(t.start_date);
             const end = new Date(start);
             end.setDate(start.getDate() + (t.duration || 1));
 
             return {
-                start: start,
-                end: end,
+                start,
+                end,
                 name: t.name,
                 id: String(t.id),
                 type: 'task',
@@ -156,31 +352,30 @@ const ProjectDetails = () => {
                 isDisabled: false,
                 dependencies: [],
                 styles: {
-                    progressColor: t.is_critical ? '#b71c1c' : '#0d47a1',
-                    progressSelectedColor: t.is_critical ? '#8e0000' : '#002171',
-                    backgroundColor: t.is_critical ? '#ff8a80' : '#82b1ff',
-                    backgroundSelectedColor: t.is_critical ? '#ff5252' : '#448aff'
+                    progressColor: t.is_critical ? '#dc2626' : tokens.color.accent,
+                    progressSelectedColor: t.is_critical ? '#b91c1c' : tokens.color.accentDark,
+                    backgroundColor: t.is_critical
+                        ? tokens.color.criticalLight
+                        : alpha(tokens.color.accent, 0.45),
+                    backgroundSelectedColor: t.is_critical ? '#ef4444' : tokens.color.accent,
                 },
             };
         });
     }, [rawTasks]);
 
-    // Mutations
+    // ─── Mutations ───────────────────────────────────────────────
     const saveTaskMutation = useMutation({
-        mutationFn: (payload) => editingTask
-            ? api.put(`/pm/tasks/${editingTask.id}/`, payload)
-            : api.post('/pm/tasks/', payload),
-        onSuccess: (data) => {
-            console.log('Task saved successfully in project details:', data);
+        mutationFn: (payload) =>
+            editingTask
+                ? api.put(`/pm/tasks/${editingTask.id}/`, payload)
+                : api.post('/pm/tasks/', payload),
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
             setOpenTaskForm(false);
             setEditingTask(null);
-            setRefreshTrigger(prev => prev + 1);
+            setRefreshTrigger((p) => p + 1);
         },
-        onError: (err) => {
-            console.error('Error saving task in project details:', err);
-            alert(`Failed to save task: ${err.message}`);
-        }
+        onError: (err) => alert(`Failed to save task: ${err.message}`),
     });
 
     const deleteTaskMutation = useMutation({
@@ -189,77 +384,98 @@ const ProjectDetails = () => {
             queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
             setDeleteModalOpen(false);
             setTaskToDelete(null);
-            setRefreshTrigger(prev => prev + 1);
+            setRefreshTrigger((p) => p + 1);
         },
-        onError: (err) => console.error('Error deleting task:', err)
+        onError: (err) => console.error('Error deleting task:', err),
     });
 
     const updateTaskStatusMutation = useMutation({
-        mutationFn: ({ taskId, status }) => {
-            console.log('ProjectDetails: Updating task', taskId, 'to status', status);
-            return api.patch(`/pm/tasks/${taskId}/`, { status });
-        },
-        onSuccess: (data) => {
-            console.log('Task status updated successfully in project details:', data);
+        mutationFn: ({ taskId, status }) =>
+            api.patch(`/pm/tasks/${taskId}/`, { status }),
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
-            setRefreshTrigger(prev => prev + 1);
+            setRefreshTrigger((p) => p + 1);
         },
-        onError: (err) => {
-            console.error('Error updating task status in project details:', err);
-            alert(`Failed to move task: ${err.message}`);
-        }
+        onError: (err) => alert(`Failed to move task: ${err.message}`),
     });
 
-    const ganttRef = useRef(null);
-    const cpmRef = useRef(null);
-    const taskGridRef = useRef(null);
-    const networkRef = useRef(null);
-
-    const handleDownload = (ref, filename) => {
-        if (!ref.current) return;
+    // ─── Handlers ────────────────────────────────────────────────
+    const handleDownload = (refKey, filename, targetTab) => {
         setDownloadAnchor(null);
+        const ref = refs[refKey];
 
-        // For Gantt, we want to capture the entire scrollable area
-        const isGantt = filename.includes('gantt');
-        const target = isGantt ? ref.current.querySelector('.gantt-chart-wrapper') || ref.current : ref.current;
+        const executeDownload = () => {
+            if (!ref.current) {
+                alert('Content not available. Ensure the relevant tab is active.');
+                return;
+            }
+            if (filename === 'network-diagram' && ref.current.exportNetwork) {
+                ref.current.exportNetwork();
+                return;
+            }
 
-        const originalStyle = target.style.cssText;
-        if (isGantt) {
-            target.style.height = 'auto';
-            target.style.overflow = 'visible';
-            target.style.width = 'max-content';
-        }
+            const isGantt = filename.includes('gantt');
+            const target = isGantt
+                ? ref.current.querySelector('.gantt-chart-wrapper') || ref.current
+                : ref.current;
 
-        toPng(target, { backgroundColor: '#ffffff', cacheBust: true })
-            .then((dataUrl) => {
-                if (isGantt) target.style.cssText = originalStyle;
-                const link = document.createElement('a');
-                link.download = `${filename}-${new Date().getTime()}.png`;
-                link.href = dataUrl;
-                link.click();
+            const originalStyle = target.style.cssText;
+            if (isGantt) {
+                target.style.height = 'auto';
+                target.style.overflow = 'visible';
+                target.style.width = 'max-content';
+            }
+
+            toBlob(target, {
+                backgroundColor: tokens.color.surface,
+                cacheBust: true,
+                skipFonts: true,
+                filter: (node) => node.id !== 'view-options-panel',
             })
-            .catch(err => {
-                if (isGantt) target.style.cssText = originalStyle;
-                console.error('Download failed', err);
-            });
+                .then((blob) => {
+                    if (isGantt) target.style.cssText = originalStyle;
+                    if (!blob) {
+                        alert('Export failed — could not capture the element.');
+                        return;
+                    }
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.download = `${filename}-${Date.now()}.png`;
+                    link.href = url;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                })
+                .catch((err) => {
+                    if (isGantt) target.style.cssText = originalStyle;
+                    alert(`Export failed: ${err.message}`);
+                });
+        };
+
+        if (targetTab !== undefined && tab !== targetTab) {
+            setTab(targetTab);
+            // TODO: Replace setTimeout with an off-screen render approach
+            // to eliminate this race condition risk on slow machines.
+            setTimeout(executeDownload, 800);
+        } else {
+            setTimeout(executeDownload, 100);
+        }
     };
 
     const handleCSVExport = (data, filename) => {
-        if (!data || data.length === 0) return;
+        if (!data?.length) return;
         setDownloadAnchor(null);
 
         const columns = ['name', 'duration', 'es', 'ef', 'ls', 'lf', 'slack', 'is_critical'];
-        const headers = columns.map(c => c.toUpperCase().replace('_', ' ')).join(',');
+        const headers = columns.map((c) => c.toUpperCase().replace('_', ' ')).join(',');
+        const rows = data
+            .map((row) => columns.map((col) => `"${row[col] ?? ''}"`).join(','))
+            .join('\n');
 
-        const rows = data.map(row =>
-            columns.map(col => `"${row[col] ?? ''}"`).join(',')
-        ).join('\n');
-
-        const csvContent = `data:text/csv;charset=utf-8,${headers}\n${rows}`;
-        const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `${filename}-${new Date().getTime()}.csv`);
+        link.setAttribute('href', encodeURI(`data:text/csv;charset=utf-8,${headers}\n${rows}`));
+        link.setAttribute('download', `${filename}-${Date.now()}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -271,7 +487,7 @@ const ProjectDetails = () => {
         queryClient.invalidateQueries({ queryKey: ['expenses', id] });
         queryClient.invalidateQueries({ queryKey: ['budget-categories', id] });
         queryClient.invalidateQueries({ queryKey: ['monthly-budgets', id] });
-        setRefreshTrigger(prev => prev + 1);
+        setRefreshTrigger((p) => p + 1);
     };
 
     const handleTaskSave = (taskData) => {
@@ -284,399 +500,1171 @@ const ProjectDetails = () => {
     };
 
     const handleConfirmDeleteTask = () => {
-        if (taskToDelete) {
-            deleteTaskMutation.mutate(taskToDelete.id);
-        }
+        if (taskToDelete) deleteTaskMutation.mutate(taskToDelete.id);
     };
 
-    const handleFileUpload = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('project', id);
-
-        // Get CSRF token
-        const getCookie = (name) => {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        };
-
-        const csrftoken = getCookie('csrftoken');
-        const headers = {};
-        if (csrftoken) {
-            headers['X-CSRFToken'] = csrftoken;
-        }
-
-        fetch('http://localhost:8000/api/files/', {
-            method: 'POST',
-            headers: headers,
-            body: formData,
-            credentials: 'include'
-        }).then(() => fetchProjectData());
+    const toggleAnalyticsFullscreen = () => {
+        setAnalyticsFullscreen((prev) => !prev);
     };
 
-    const handleFileDelete = (fileId) => {
-        if (window.confirm("Delete file?")) {
-            api.delete(`/files/${fileId}/`)
-                .then(() => fetchProjectData());
-        }
+    // NOTE: handleFileUpload and handleFileDelete have been intentionally
+    // removed. File management is handled entirely by <FileTree />.
+    // The previous version contained a hardcoded localhost URL that would
+    // break in production.
+
+    // ─── Loading State ───────────────────────────────────────────
+    if (projectLoading) {
+        return (
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100vh',
+                    gap: 3,
+                    bgcolor: tokens.color.background,
+                }}
+            >
+                <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                    <CircularProgress
+                        size={56}
+                        thickness={3}
+                        sx={{ color: tokens.color.accent }}
+                    />
+                    <Box
+                        sx={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <AccountTreeIcon
+                            sx={{ fontSize: 20, color: tokens.color.primary }}
+                        />
+                    </Box>
+                </Box>
+                <Box sx={{ textAlign: 'center' }}>
+                    <Typography
+                        variant="h6"
+                        sx={{
+                            fontWeight: tokens.weight.bold,
+                            color: tokens.color.primary,
+                            mb: 0.5,
+                        }}
+                    >
+                        Loading Project
+                    </Typography>
+                    <Typography
+                        variant="body2"
+                        sx={{ color: tokens.color.textSecondary }}
+                    >
+                        Preparing your project intelligence…
+                    </Typography>
+                </Box>
+            </Box>
+        );
     }
 
-    if (!project) return <div>Loading...</div>;
+    // ─── Error State ─────────────────────────────────────────────
+    if (projectError) {
+        return (
+            <Box
+                sx={{
+                    p: 4,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100vh',
+                    gap: 3,
+                    bgcolor: tokens.color.background,
+                }}
+            >
+                <Avatar
+                    sx={{
+                        width: 72,
+                        height: 72,
+                        bgcolor: tokens.color.criticalBg,
+                    }}
+                >
+                    <WarningIcon
+                        sx={{ fontSize: 36, color: tokens.color.critical }}
+                    />
+                </Avatar>
+                <Box sx={{ textAlign: 'center' }}>
+                    <Typography
+                        variant="h5"
+                        sx={{
+                            fontWeight: tokens.weight.bold,
+                            color: tokens.color.critical,
+                            mb: 1,
+                        }}
+                    >
+                        Failed to load project
+                    </Typography>
+                    <Typography
+                        sx={{
+                            color: tokens.color.textSecondary,
+                            maxWidth: 440,
+                            lineHeight: 1.6,
+                        }}
+                    >
+                        {projectError.message ||
+                            'An unexpected error occurred while fetching project data.'}
+                    </Typography>
+                </Box>
+                <Button
+                    variant="contained"
+                    onClick={fetchProjectData}
+                    sx={{
+                        mt: 1,
+                        borderRadius: tokens.radius.sm,
+                        bgcolor: tokens.color.primary,
+                        px: 4,
+                        py: 1.2,
+                        fontWeight: tokens.weight.semibold,
+                        textTransform: 'none',
+                        '&:hover': { bgcolor: tokens.color.primaryLight },
+                    }}
+                >
+                    Try Again
+                </Button>
+            </Box>
+        );
+    }
+
+    if (!project) return null;
 
     return (
-        <Box sx={{ p: 4, maxWidth: 1600, margin: '0 auto', bgcolor: '#fcfcfc', minHeight: '100vh' }}>
+        <Box
+            sx={{
+                p: { xs: 2, md: 4 },
+                maxWidth: 1600,
+                margin: '0 auto',
+                bgcolor: tokens.color.background,
+                minHeight: '100vh',
+            }}
+        >
             <style>{ganttStyles}</style>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+            <style>{fullscreenStyles}</style>
+
+            {/* ─── Page Header ─────────────────────────────────── */}
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'column', md: 'row' },
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'stretch', md: 'center' },
+                    mb: 4,
+                    gap: 2,
+                }}
+            >
                 <Box>
-                    <Typography variant="h3" sx={{ fontWeight: 900, color: '#1a237e', letterSpacing: -1 }}>
+                    <Typography
+                        variant="h3"
+                        sx={{
+                            fontWeight: tokens.weight.bold,
+                            color: tokens.color.primary,
+                            letterSpacing: '-0.02em',
+                            fontSize: { xs: '1.75rem', md: '2.5rem' },
+                            lineHeight: 1.2,
+                        }}
+                    >
                         {project.name}
                     </Typography>
-                    <Typography variant="subtitle1" color="textSecondary" sx={{ fontWeight: 500 }}>
+                    <Typography
+                        variant="subtitle1"
+                        sx={{
+                            fontWeight: tokens.weight.normal,
+                            color: tokens.color.textSecondary,
+                            mt: 0.5,
+                        }}
+                    >
                         Project Intelligence & Timeline
                     </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 2 }}>
+
+                <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1.5}
+                    sx={{ flexShrink: 0 }}
+                >
                     <Button
                         variant="contained"
                         startIcon={<AddIcon />}
-                        onClick={() => { setEditingTask(null); setOpenTaskForm(true); }}
-                        sx={{ borderRadius: 3, px: 3, py: 1, fontWeight: 700, boxShadow: '0 4px 14px rgba(0,0,0,0.1)' }}
+                        onClick={() => {
+                            setEditingTask(null);
+                            setOpenTaskForm(true);
+                        }}
+                        sx={{
+                            borderRadius: tokens.radius.sm,
+                            px: 3,
+                            py: 1.2,
+                            fontWeight: tokens.weight.semibold,
+                            textTransform: 'none',
+                            bgcolor: tokens.color.accent,
+                            boxShadow: `0 4px 14px ${alpha(tokens.color.accent, 0.3)}`,
+                            '&:hover': {
+                                bgcolor: tokens.color.accentDark,
+                                boxShadow: `0 6px 20px ${alpha(tokens.color.accent, 0.4)}`,
+                            },
+                        }}
                     >
                         Add Task
                     </Button>
+
                     <Button
                         variant="contained"
                         startIcon={<DownloadIcon />}
                         onClick={(e) => setDownloadAnchor(e.currentTarget)}
-                        sx={{ borderRadius: 3, px: 3, fontWeight: 700, boxShadow: '0 4px 12px rgba(25, 118, 210, 0.2)' }}
+                        sx={{
+                            borderRadius: tokens.radius.sm,
+                            px: 3,
+                            py: 1.2,
+                            fontWeight: tokens.weight.semibold,
+                            textTransform: 'none',
+                            bgcolor: tokens.color.primary,
+                            boxShadow: `0 4px 14px ${alpha(tokens.color.primary, 0.25)}`,
+                            '&:hover': { bgcolor: tokens.color.primaryLight },
+                        }}
                     >
-                        Export Report
+                        Export
                     </Button>
+
                     <Menu
                         anchorEl={downloadAnchor}
                         open={Boolean(downloadAnchor)}
                         onClose={() => setDownloadAnchor(null)}
-                        PaperProps={{ sx: { borderRadius: 2, mt: 1, minWidth: 180 } }}
+                        PaperProps={{
+                            sx: {
+                                borderRadius: tokens.radius.md,
+                                mt: 1,
+                                minWidth: 220,
+                                boxShadow: tokens.shadow.lg,
+                                border: `1px solid ${tokens.color.neutralLight}`,
+                            },
+                        }}
+                        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                     >
-                        <MenuItem onClick={() => handleDownload(ganttRef, 'gantt-chart')}>
-                            <DownloadIcon sx={{ mr: 1, fontSize: 18 }} /> Gantt Chart
-                        </MenuItem>
-                        <MenuItem onClick={() => handleDownload(networkRef, 'network-diagram')}>
-                            <DownloadIcon sx={{ mr: 1, fontSize: 18 }} /> Network Diagram
-                        </MenuItem>
-                        <MenuItem onClick={() => handleDownload(cpmRef, 'cpm-analysis')}>
-                            <DownloadIcon sx={{ mr: 1, fontSize: 18 }} /> CPM Analysis
-                        </MenuItem>
-                        <MenuItem onClick={() => handleDownload(taskGridRef, 'task-repository')}>
-                            <DownloadIcon sx={{ mr: 1, fontSize: 18 }} /> Task Repository
-                        </MenuItem>
-                        <Divider />
-                        <MenuItem onClick={() => handleCSVExport(cpmData, 'cpm-analysis-data')}>
-                            <DownloadIcon sx={{ mr: 1, fontSize: 18 }} /> CPM Data (CSV)
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                px: 2,
+                                py: 1,
+                                display: 'block',
+                                fontWeight: tokens.weight.bold,
+                                color: tokens.color.textMuted,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                            }}
+                        >
+                            Export as Image
+                        </Typography>
+                        {EXPORT_ITEMS.map((item) => (
+                            <MenuItem
+                                key={item.file}
+                                onClick={() => handleDownload(item.refKey, item.file, item.tab)}
+                                sx={{ fontSize: '0.875rem' }}
+                            >
+                                <DownloadIcon
+                                    sx={{ mr: 1.5, fontSize: 18, color: tokens.color.textMuted }}
+                                />
+                                {item.label}
+                            </MenuItem>
+                        ))}
+                        <Divider sx={{ my: 1 }} />
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                px: 2,
+                                py: 1,
+                                display: 'block',
+                                fontWeight: tokens.weight.bold,
+                                color: tokens.color.textMuted,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                            }}
+                        >
+                            Export as Data
+                        </Typography>
+                        <MenuItem
+                            onClick={() => handleCSVExport(cpmData, 'cpm-analysis-data')}
+                            sx={{ fontSize: '0.875rem' }}
+                        >
+                            <DownloadIcon
+                                sx={{ mr: 1.5, fontSize: 18, color: tokens.color.textMuted }}
+                            />
+                            CPM Data (CSV)
                         </MenuItem>
                     </Menu>
-                    <Button
-                        variant="outlined"
-                        onClick={fetchProjectData}
-                        sx={{ borderRadius: 3, px: 3, fontWeight: 600 }}
-                    >
-                        Refresh
-                    </Button>
-                </Box>
+
+                    <Tooltip title="Refresh all data" arrow>
+                        <IconButton
+                            onClick={fetchProjectData}
+                            aria-label="Refresh project data"
+                            sx={{
+                                border: `1px solid ${tokens.color.neutralLight}`,
+                                borderRadius: tokens.radius.sm,
+                                color: tokens.color.textSecondary,
+                                '&:hover': {
+                                    bgcolor: tokens.color.neutralLighter,
+                                    borderColor: tokens.color.neutral,
+                                },
+                            }}
+                        >
+                            <RefreshIcon />
+                        </IconButton>
+                    </Tooltip>
+                </Stack>
             </Box>
 
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={tab} onChange={(e, v) => setTab(v)}>
-                    <Tab label="Overview" />
-                    <Tab label="Tasks" />
-                    <Tab label="Timeline & Analysis" />
-                    <Tab label="Network Diagram" />
-                    <Tab label="Team" />
-                    <Tab label="Milestones" />
-                    <Tab label="Budget" />
-                    <Tab label="Analytics" />
-                    <Tab label="Files" />
+            {/* ─── Tabs ────────────────────────────────────────── */}
+            <Box sx={{ borderBottom: `2px solid ${tokens.color.neutralLighter}`, mb: 3 }}>
+                <Tabs
+                    value={tab}
+                    onChange={(_, v) => setTab(v)}
+                    variant={isMobile ? 'scrollable' : 'standard'}
+                    scrollButtons={isMobile ? 'auto' : false}
+                    allowScrollButtonsMobile
+                    sx={{
+                        '& .MuiTab-root': {
+                            textTransform: 'none',
+                            fontWeight: tokens.weight.semibold,
+                            fontSize: '0.875rem',
+                            color: tokens.color.textSecondary,
+                            minHeight: 48,
+                            px: 2.5,
+                            transition: tokens.transition.fast,
+                            '&:hover': {
+                                color: tokens.color.primary,
+                                bgcolor: alpha(tokens.color.primary, 0.04),
+                            },
+                        },
+                        '& .Mui-selected': {
+                            color: `${tokens.color.primary} !important`,
+                            fontWeight: tokens.weight.bold,
+                        },
+                        '& .MuiTabs-indicator': {
+                            backgroundColor: tokens.color.accent,
+                            height: 3,
+                            borderRadius: '3px 3px 0 0',
+                        },
+                    }}
+                >
+                    {TAB_LABELS.map((label) => (
+                        <Tab key={label} label={label} />
+                    ))}
                 </Tabs>
             </Box>
 
-            <Box sx={{ p: 3 }}>
-                <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
-                    <Card elevation={0} sx={{ p: 4, borderRadius: 4, bgcolor: '#f8f9fa', border: '1px solid #e0e0e0' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: '#1a237e' }}>Project Description</Typography>
-                        <Typography variant="body1" sx={{ lineHeight: 1.8, color: 'text.secondary', whiteSpace: 'pre-wrap' }}>
-                            {project.description || "No description provided for this project."}
+            {/* ─── Tab Panels ──────────────────────────────────── */}
+            <Box sx={{ py: 1 }}>
+
+                {/* 0 — Overview */}
+                {tab === 0 && (
+                    <SectionCard sx={{ p: 4 }}>
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                fontWeight: tokens.weight.bold,
+                                mb: 2,
+                                color: tokens.color.primary,
+                            }}
+                        >
+                            Project Description
                         </Typography>
-                    </Card>
-                </Box>
+                        <Typography
+                            variant="body1"
+                            sx={{
+                                lineHeight: 1.8,
+                                color: tokens.color.textSecondary,
+                                whiteSpace: 'pre-wrap',
+                            }}
+                        >
+                            {project.description || 'No description provided for this project.'}
+                        </Typography>
+                    </SectionCard>
+                )}
 
-                <Box sx={{ display: tab === 1 ? 'block' : 'none' }}>
-                    <ProjectTasksTab
-                        tasks={rawTasks}
-                        onAddTask={() => { setEditingTask(null); setOpenTaskForm(true); }}
-                        onEditTask={(task) => { setEditingTask(task); setOpenTaskForm(true); }}
-                        onDeleteTask={handleTaskDelete}
-                        onStatusChange={(taskId, status) => updateTaskStatusMutation.mutate({ taskId, status })}
-                        users={users}
-                    />
-                </Box>
+                {/* 1 — Tasks */}
+                {tab === 1 && (
+                    <Box ref={refs.taskGrid}>
+                        <ProjectTasksTab
+                            tasks={rawTasks}
+                            onAddTask={() => {
+                                setEditingTask(null);
+                                setOpenTaskForm(true);
+                            }}
+                            onEditTask={(task) => {
+                                setEditingTask(task);
+                                setOpenTaskForm(true);
+                            }}
+                            onDeleteTask={handleTaskDelete}
+                            onStatusChange={(taskId, status) =>
+                                updateTaskStatusMutation.mutate({ taskId, status })
+                            }
+                            users={users}
+                        />
+                    </Box>
+                )}
 
-                <Box sx={{ display: tab === 2 ? 'block' : 'none' }}>
+                {/* 2 — Timeline & Analysis */}
+                {tab === 2 && (
                     <Grid container spacing={3}>
+                        {/* Gantt Chart */}
                         <Grid item xs={12}>
-                            <Card elevation={3} sx={{ borderRadius: 4, overflow: 'hidden' }}>
+                            <SectionCard>
                                 <CardHeader
-                                    title="Project Timeline (Gantt)"
-                                    titleTypographyProps={{ variant: 'h6', fontWeight: 800 }}
+                                    title="Project Timeline"
+                                    subheader="Interactive Gantt chart — drag to adjust timelines"
+                                    titleTypographyProps={{
+                                        variant: 'h6',
+                                        fontWeight: tokens.weight.bold,
+                                        color: tokens.color.primary,
+                                    }}
+                                    subheaderTypographyProps={{
+                                        variant: 'body2',
+                                        color: tokens.color.textMuted,
+                                    }}
                                     action={
-                                        <Stack direction="row" spacing={2} alignItems="center">
+                                        <Stack
+                                            direction="row"
+                                            spacing={1.5}
+                                            alignItems="center"
+                                            id="view-options-panel"
+                                        >
                                             <Button
                                                 size="small"
-                                                variant={fullView ? "contained" : "outlined"}
+                                                variant={fullView ? 'contained' : 'outlined'}
                                                 onClick={() => setFullView(!fullView)}
-                                                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
+                                                sx={{
+                                                    borderRadius: tokens.radius.sm,
+                                                    textTransform: 'none',
+                                                    fontWeight: tokens.weight.semibold,
+                                                    fontSize: '0.8125rem',
+                                                    ...(fullView
+                                                        ? {
+                                                            bgcolor: tokens.color.primary,
+                                                            '&:hover': {
+                                                                bgcolor: tokens.color.primaryLight,
+                                                            },
+                                                        }
+                                                        : {
+                                                            borderColor: tokens.color.neutralLight,
+                                                            color: tokens.color.textSecondary,
+                                                            '&:hover': {
+                                                                borderColor: tokens.color.accent,
+                                                                color: tokens.color.accent,
+                                                            },
+                                                        }),
+                                                }}
                                             >
-                                                {fullView ? "Exit Full View" : "Full View"}
+                                                {fullView ? 'Exit Full' : 'Full View'}
                                             </Button>
                                             <ToggleButtonGroup
                                                 value={viewMode}
                                                 exclusive
-                                                onChange={(e, nextView) => nextView && setViewMode(nextView)}
+                                                onChange={(_, next) => next && setViewMode(next)}
                                                 size="small"
-                                                sx={{ bgcolor: 'background.paper' }}
+                                                sx={{
+                                                    '& .MuiToggleButton-root': {
+                                                        border: `1px solid ${tokens.color.neutralLight}`,
+                                                        color: tokens.color.textMuted,
+                                                        px: 1.5,
+                                                        '&.Mui-selected': {
+                                                            bgcolor: alpha(tokens.color.accent, 0.1),
+                                                            color: tokens.color.accent,
+                                                            borderColor: alpha(tokens.color.accent, 0.3),
+                                                            '&:hover': {
+                                                                bgcolor: alpha(tokens.color.accent, 0.15),
+                                                            },
+                                                        },
+                                                    },
+                                                }}
                                             >
-                                                <ToggleButton value={ViewMode.Day}>
-                                                    <Tooltip title="Day View"><DayIcon fontSize="small" /></Tooltip>
+                                                <ToggleButton value={ViewMode.Day} aria-label="Day view">
+                                                    <Tooltip title="Day">
+                                                        <DayIcon fontSize="small" />
+                                                    </Tooltip>
                                                 </ToggleButton>
-                                                <ToggleButton value={ViewMode.Week}>
-                                                    <Tooltip title="Week View"><WeekIcon fontSize="small" /></Tooltip>
+                                                <ToggleButton value={ViewMode.Week} aria-label="Week view">
+                                                    <Tooltip title="Week">
+                                                        <WeekIcon fontSize="small" />
+                                                    </Tooltip>
                                                 </ToggleButton>
-                                                <ToggleButton value={ViewMode.Month}>
-                                                    <Tooltip title="Month View"><CalendarIcon fontSize="small" /></Tooltip>
+                                                <ToggleButton value={ViewMode.Month} aria-label="Month view">
+                                                    <Tooltip title="Month">
+                                                        <CalendarIcon fontSize="small" />
+                                                    </Tooltip>
                                                 </ToggleButton>
-                                                <ToggleButton value={ViewMode.Year}>
-                                                    <Tooltip title="Year View"><YearIcon fontSize="small" /></Tooltip>
+                                                <ToggleButton value={ViewMode.Year} aria-label="Year view">
+                                                    <Tooltip title="Year">
+                                                        <YearIcon fontSize="small" />
+                                                    </Tooltip>
                                                 </ToggleButton>
                                             </ToggleButtonGroup>
                                         </Stack>
                                     }
+                                    sx={{
+                                        borderBottom: `1px solid ${tokens.color.neutralLighter}`,
+                                        px: 3,
+                                        py: 2,
+                                    }}
                                 />
-                                <Divider />
-                                <CardContent sx={{ p: 0 }} ref={ganttRef}>
+                                <CardContent sx={{ p: 0 }} ref={refs.gantt}>
                                     {tasks.length > 0 ? (
-                                        <Box className="gantt-chart-wrapper" sx={{
-                                            height: fullView ? 'auto' : 600,
-                                            overflow: fullView ? 'visible' : 'auto',
-                                            bgcolor: '#ffffff',
-                                            '& .gantt-container': {
-                                                fontFamily: 'inherit'
-                                            }
-                                        }}>
+                                        <Box
+                                            className="gantt-chart-wrapper"
+                                            sx={{
+                                                height: fullView ? 'auto' : 600,
+                                                overflow: fullView ? 'visible' : 'auto',
+                                                bgcolor: tokens.color.surface,
+                                                '& .gantt-container': { fontFamily: 'inherit' },
+                                            }}
+                                        >
                                             <Gantt
                                                 tasks={tasks}
                                                 viewMode={viewMode}
                                                 listCellWidth="200px"
-                                                columnWidth={viewMode === ViewMode.Year ? 150 : viewMode === ViewMode.Month ? 100 : 60}
-                                                barCornerRadius={6}
+                                                columnWidth={
+                                                    viewMode === ViewMode.Year
+                                                        ? 150
+                                                        : viewMode === ViewMode.Month
+                                                            ? 100
+                                                            : 60
+                                                }
+                                                barCornerRadius={2}
                                                 handleWidth={8}
                                                 fontFamily="inherit"
                                                 fontSize="12px"
                                                 headerHeight={50}
                                                 rowHeight={50}
-                                                todayColor="rgba(25, 118, 210, 0.1)"
+                                                todayColor={alpha(tokens.color.accent, 0.08)}
                                             />
                                         </Box>
                                     ) : (
-                                        <Box sx={{ p: 6, textAlign: 'center' }}>
-                                            <Typography color="textSecondary" variant="h6">No tasks scheduled yet.</Typography>
-                                            <Typography color="textSecondary">Add tasks to see the project timeline.</Typography>
+                                        <Box
+                                            sx={{
+                                                p: 8,
+                                                textAlign: 'center',
+                                                bgcolor: tokens.color.neutralLighter,
+                                            }}
+                                        >
+                                            <CalendarIcon
+                                                sx={{
+                                                    fontSize: 48,
+                                                    color: tokens.color.neutral,
+                                                    mb: 2,
+                                                }}
+                                            />
+                                            <Typography
+                                                variant="h6"
+                                                sx={{
+                                                    color: tokens.color.textSecondary,
+                                                    fontWeight: tokens.weight.semibold,
+                                                    mb: 0.5,
+                                                }}
+                                            >
+                                                No tasks scheduled yet
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                sx={{ color: tokens.color.textMuted }}
+                                            >
+                                                Add tasks to visualize the project timeline.
+                                            </Typography>
                                         </Box>
                                     )}
                                 </CardContent>
-                            </Card>
+                            </SectionCard>
                         </Grid>
 
+                        {/* CPM Analysis */}
                         {cpmData.length > 0 && (
-                            <Grid item xs={12} ref={cpmRef} sx={{ bgcolor: '#ffffff', p: 2, borderRadius: 4 }}>
-                                <Card elevation={3} sx={{ borderRadius: 4, border: '1px solid #e0e0e0', overflow: 'hidden' }}>
+                            <Grid
+                                item
+                                xs={12}
+                                ref={refs.cpm}
+                                sx={{
+                                    bgcolor: tokens.color.surface,
+                                    p: 2,
+                                    borderRadius: tokens.radius.lg,
+                                }}
+                            >
+                                <SectionCard>
                                     <CardHeader
-                                        avatar={<Avatar sx={{ bgcolor: 'primary.main' }}><TrendingUpIcon /></Avatar>}
+                                        avatar={
+                                            <Avatar
+                                                sx={{
+                                                    bgcolor: tokens.color.primary,
+                                                    width: 40,
+                                                    height: 40,
+                                                }}
+                                            >
+                                                <TrendingUpIcon fontSize="small" />
+                                            </Avatar>
+                                        }
                                         title="Critical Path Analysis"
-                                        titleTypographyProps={{ variant: 'h6', fontWeight: 800 }}
+                                        subheader="Longest dependent task sequence & minimum project duration"
+                                        titleTypographyProps={{
+                                            variant: 'h6',
+                                            fontWeight: tokens.weight.bold,
+                                            color: tokens.color.primary,
+                                        }}
+                                        subheaderTypographyProps={{
+                                            variant: 'body2',
+                                            color: tokens.color.textMuted,
+                                        }}
                                         action={
                                             <Tooltip title="CPM identifies the longest sequence of dependent tasks and the shortest possible project duration.">
-                                                <IconButton><InfoIcon /></IconButton>
+                                                <IconButton aria-label="About Critical Path Method">
+                                                    <InfoIcon sx={{ color: tokens.color.neutral }} />
+                                                </IconButton>
                                             </Tooltip>
                                         }
+                                        sx={{
+                                            borderBottom: `1px solid ${tokens.color.neutralLighter}`,
+                                            px: 3,
+                                            py: 2,
+                                        }}
                                     />
-                                    <Divider />
                                     <CardContent sx={{ p: 3 }}>
-                                        <Box>
-                                            <Grid container spacing={2} sx={{ mb: 4 }}>
-                                                <Grid item xs={12} md={4}>
-                                                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#fff5f5', border: '1px solid #ffcdd2' }}>
-                                                        <Avatar sx={{ bgcolor: '#ff5252' }}><TimerIcon /></Avatar>
-                                                        <Box>
-                                                            <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>Project Duration</Typography>
-                                                            <Typography variant="h5" sx={{ fontWeight: 900 }}>{Math.max(...cpmData.map(t => t.ef || 0))} Days</Typography>
-                                                        </Box>
-                                                    </Paper>
-                                                </Grid>
-                                                <Grid item xs={12} md={4}>
-                                                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#f0f4ff', border: '1px solid #d1d9ff' }}>
-                                                        <Avatar sx={{ bgcolor: '#448aff' }}><AccountTreeIcon /></Avatar>
-                                                        <Box>
-                                                            <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>Critical Tasks</Typography>
-                                                            <Typography variant="h5" sx={{ fontWeight: 900 }}>{cpmData.filter(t => t.is_critical).length}</Typography>
-                                                        </Box>
-                                                    </Paper>
-                                                </Grid>
-                                                <Grid item xs={12} md={4}>
-                                                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#fff9f0', border: '1px solid #ffe0b2' }}>
-                                                        <Avatar sx={{ bgcolor: '#ff9800' }}><WarningIcon /></Avatar>
-                                                        <Box>
-                                                            <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>Total Slack</Typography>
-                                                            <Typography variant="h5" sx={{ fontWeight: 900 }}>{cpmData.reduce((acc, t) => acc + (t.slack || 0), 0)} Days</Typography>
-                                                        </Box>
-                                                    </Paper>
-                                                </Grid>
+                                        {/* Stat Cards */}
+                                        <Grid container spacing={2} sx={{ mb: 4 }}>
+                                            <Grid item xs={12} md={4}>
+                                                <StatCard
+                                                    icon={<TimerIcon fontSize="small" />}
+                                                    iconBg={tokens.color.critical}
+                                                    label="Project Duration"
+                                                    value={`${Math.max(...cpmData.map((t) => t.ef || 0))} Days`}
+                                                    bgColor={tokens.color.criticalBg}
+                                                    borderColor={tokens.color.criticalBorder}
+                                                />
                                             </Grid>
+                                            <Grid item xs={12} md={4}>
+                                                <StatCard
+                                                    icon={<AccountTreeIcon fontSize="small" />}
+                                                    iconBg={tokens.color.accent}
+                                                    label="Critical Tasks"
+                                                    value={cpmData.filter((t) => t.is_critical).length}
+                                                    bgColor={tokens.color.successBg}
+                                                    borderColor={tokens.color.successBorder}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={4}>
+                                                <StatCard
+                                                    icon={<WarningIcon fontSize="small" />}
+                                                    iconBg={tokens.color.warning}
+                                                    label="Total Float"
+                                                    value={`${cpmData.reduce((a, t) => a + (t.slack || 0), 0)} Days`}
+                                                    bgColor={tokens.color.warningBg}
+                                                    borderColor={tokens.color.warningBorder}
+                                                />
+                                            </Grid>
+                                        </Grid>
 
-                                            <Box sx={{ mb: 4 }}>
-                                                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                    <TrendingUpIcon fontSize="small" color="error" /> CRITICAL PATH SEQUENCE
-                                                </Typography>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', rowGap: 2, pb: 1 }}>
-                                                    {rawTasks
-                                                        .filter(t => t.is_critical)
-                                                        .sort((a, b) => a.es - b.es)
-                                                        .map((t, index, array) => (
-                                                            <Box key={t.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                <Chip label={t.name} color="error" variant="filled" sx={{ fontWeight: 700, borderRadius: 2, px: 1 }} />
-                                                                {index < array.length - 1 && <ArrowForwardIcon sx={{ color: '#bdbdbd', fontSize: 16 }} />}
-                                                            </Box>
-                                                        ))
-                                                    }
-                                                </Box>
+                                        {/* Critical Path Sequence */}
+                                        <Box sx={{ mb: 4 }}>
+                                            <Typography
+                                                variant="subtitle2"
+                                                sx={{
+                                                    fontWeight: tokens.weight.bold,
+                                                    mb: 2,
+                                                    color: tokens.color.textSecondary,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 1,
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.5px',
+                                                    fontSize: '0.75rem',
+                                                }}
+                                            >
+                                                <TrendingUpIcon
+                                                    fontSize="small"
+                                                    sx={{ color: tokens.color.critical }}
+                                                />
+                                                Critical Path Sequence
+                                            </Typography>
+                                            <Box
+                                                sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 1,
+                                                    flexWrap: 'wrap',
+                                                    rowGap: 1.5,
+                                                    p: 2.5,
+                                                    bgcolor: tokens.color.criticalBg,
+                                                    borderRadius: tokens.radius.md,
+                                                    border: `1px solid ${tokens.color.criticalBorder}`,
+                                                }}
+                                            >
+                                                {rawTasks
+                                                    .filter((t) => t.is_critical)
+                                                    .sort((a, b) => a.es - b.es)
+                                                    .map((t, i, arr) => (
+                                                        <Box
+                                                            key={t.id}
+                                                            sx={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 1,
+                                                            }}
+                                                        >
+                                                            <Chip
+                                                                label={t.name}
+                                                                sx={{
+                                                                    fontWeight: tokens.weight.semibold,
+                                                                    borderRadius: tokens.radius.sm,
+                                                                    bgcolor: tokens.color.critical,
+                                                                    color: '#fff',
+                                                                    px: 1,
+                                                                    '&:hover': { bgcolor: '#b71c1c' },
+                                                                }}
+                                                            />
+                                                            {i < arr.length - 1 && (
+                                                                <ArrowForwardIcon
+                                                                    sx={{
+                                                                        color: tokens.color.neutral,
+                                                                        fontSize: 16,
+                                                                    }}
+                                                                />
+                                                            )}
+                                                        </Box>
+                                                    ))}
                                             </Box>
-
-                                            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-                                                <Table size="small">
-                                                    <TableHead sx={{ bgcolor: '#f8f9fa' }}>
-                                                        <TableRow>
-                                                            <TableCell sx={{ fontWeight: 800 }}>TASK NAME</TableCell>
-                                                            <TableCell align="center" sx={{ fontWeight: 800 }}>DUR</TableCell>
-                                                            <TableCell align="center" sx={{ fontWeight: 800, color: 'primary.main' }}>ES</TableCell>
-                                                            <TableCell align="center" sx={{ fontWeight: 800, color: 'primary.main' }}>EF</TableCell>
-                                                            <TableCell align="center" sx={{ fontWeight: 800, color: 'secondary.main' }}>LS</TableCell>
-                                                            <TableCell align="center" sx={{ fontWeight: 800, color: 'secondary.main' }}>LF</TableCell>
-                                                            <TableCell align="center" sx={{ fontWeight: 800 }}>SLACK</TableCell>
-                                                            <TableCell align="center" sx={{ fontWeight: 800 }}>STATUS</TableCell>
-                                                        </TableRow>
-                                                    </TableHead>
-                                                    <TableBody>
-                                                        {cpmData.map((row) => (
-                                                            <TableRow key={row.id} sx={{ bgcolor: row.is_critical ? 'rgba(211, 47, 47, 0.02)' : 'inherit', '&:hover': { bgcolor: '#f5f5f5' } }}>
-                                                                <TableCell sx={{ fontWeight: row.is_critical ? 700 : 500 }}>{row.name}</TableCell>
-                                                                <TableCell align="center">{row.duration}d</TableCell>
-                                                                <TableCell align="center" sx={{ color: 'primary.dark', fontWeight: 600 }}>{row.es}</TableCell>
-                                                                <TableCell align="center" sx={{ color: 'primary.dark', fontWeight: 600 }}>{row.ef}</TableCell>
-                                                                <TableCell align="center" sx={{ color: 'secondary.dark', fontWeight: 600 }}>{row.ls}</TableCell>
-                                                                <TableCell align="center" sx={{ color: 'secondary.dark', fontWeight: 600 }}>{row.lf}</TableCell>
-                                                                <TableCell align="center">
-                                                                    <Chip label={`${row.slack}d`} size="small" variant="outlined" color={row.slack === 0 ? "error" : "default"} sx={{ fontWeight: 700, minWidth: 45 }} />
-                                                                </TableCell>
-                                                                <TableCell align="center">
-                                                                    {row.is_critical ? (
-                                                                        <Chip label="CRITICAL" color="error" size="small" sx={{ fontWeight: 900, fontSize: '0.65rem' }} />
-                                                                    ) : (
-                                                                        <Chip label="NON-CRITICAL" variant="outlined" size="small" sx={{ fontWeight: 700, fontSize: '0.65rem', color: 'text.secondary' }} />
-                                                                    )}
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </TableContainer>
                                         </Box>
+
+                                        {/* CPM Data Table */}
+                                        <TableContainer
+                                            component={Paper}
+                                            variant="outlined"
+                                            sx={{
+                                                borderRadius: tokens.radius.md,
+                                                overflow: 'hidden',
+                                                border: `1px solid ${tokens.color.neutralLight}`,
+                                            }}
+                                        >
+                                            <Table size="small">
+                                                <TableHead>
+                                                    <TableRow sx={{ bgcolor: tokens.color.neutralLighter }}>
+                                                        {CPM_COLUMNS.map((col) => (
+                                                            <TableCell
+                                                                key={col.label}
+                                                                align={col.align}
+                                                                sx={{
+                                                                    fontWeight: tokens.weight.bold,
+                                                                    fontSize: '0.7rem',
+                                                                    textTransform: 'uppercase',
+                                                                    letterSpacing: '0.5px',
+                                                                    color:
+                                                                        col.color ||
+                                                                        tokens.color.textSecondary,
+                                                                    py: 1.5,
+                                                                    borderBottom: `2px solid ${tokens.color.neutralLight}`,
+                                                                }}
+                                                            >
+                                                                {col.label}
+                                                            </TableCell>
+                                                        ))}
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {cpmData.map((row) => (
+                                                        <TableRow
+                                                            key={row.id}
+                                                            sx={{
+                                                                bgcolor: row.is_critical
+                                                                    ? alpha(tokens.color.critical, 0.02)
+                                                                    : 'inherit',
+                                                                '&:hover': {
+                                                                    bgcolor: row.is_critical
+                                                                        ? alpha(tokens.color.critical, 0.04)
+                                                                        : tokens.color.surfaceHover,
+                                                                },
+                                                                transition: tokens.transition.fast,
+                                                                '& td': {
+                                                                    borderBottom: `1px solid ${tokens.color.neutralLighter}`,
+                                                                },
+                                                            }}
+                                                        >
+                                                            <TableCell
+                                                                sx={{
+                                                                    fontWeight: row.is_critical
+                                                                        ? tokens.weight.bold
+                                                                        : tokens.weight.normal,
+                                                                    color: tokens.color.text,
+                                                                }}
+                                                            >
+                                                                <Box
+                                                                    sx={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 1,
+                                                                    }}
+                                                                >
+                                                                    {row.is_critical && (
+                                                                        <Box
+                                                                            sx={{
+                                                                                width: 3,
+                                                                                height: 20,
+                                                                                borderRadius: 2,
+                                                                                bgcolor: tokens.color.critical,
+                                                                                flexShrink: 0,
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                    {row.name}
+                                                                </Box>
+                                                            </TableCell>
+                                                            <TableCell
+                                                                align="center"
+                                                                sx={{
+                                                                    color: tokens.color.textSecondary,
+                                                                    fontWeight: tokens.weight.semibold,
+                                                                }}
+                                                            >
+                                                                {row.duration}d
+                                                            </TableCell>
+                                                            <TableCell
+                                                                align="center"
+                                                                sx={{
+                                                                    color: tokens.color.accent,
+                                                                    fontWeight: tokens.weight.semibold,
+                                                                }}
+                                                            >
+                                                                {row.es}
+                                                            </TableCell>
+                                                            <TableCell
+                                                                align="center"
+                                                                sx={{
+                                                                    color: tokens.color.accent,
+                                                                    fontWeight: tokens.weight.semibold,
+                                                                }}
+                                                            >
+                                                                {row.ef}
+                                                            </TableCell>
+                                                            <TableCell
+                                                                align="center"
+                                                                sx={{
+                                                                    color: tokens.color.lateSchedule,
+                                                                    fontWeight: tokens.weight.semibold,
+                                                                }}
+                                                            >
+                                                                {row.ls}
+                                                            </TableCell>
+                                                            <TableCell
+                                                                align="center"
+                                                                sx={{
+                                                                    color: tokens.color.lateSchedule,
+                                                                    fontWeight: tokens.weight.semibold,
+                                                                }}
+                                                            >
+                                                                {row.lf}
+                                                            </TableCell>
+                                                            <TableCell align="center">
+                                                                <Chip
+                                                                    label={`${row.slack}d`}
+                                                                    size="small"
+                                                                    sx={{
+                                                                        fontWeight: tokens.weight.bold,
+                                                                        minWidth: 48,
+                                                                        borderRadius: tokens.radius.sm,
+                                                                        bgcolor:
+                                                                            row.slack === 0
+                                                                                ? alpha(
+                                                                                    tokens.color.critical,
+                                                                                    0.1
+                                                                                )
+                                                                                : alpha(
+                                                                                    tokens.color.neutral,
+                                                                                    0.15
+                                                                                ),
+                                                                        color:
+                                                                            row.slack === 0
+                                                                                ? tokens.color.critical
+                                                                                : tokens.color.textSecondary,
+                                                                        border: `1px solid ${row.slack === 0
+                                                                            ? tokens.color.criticalBorder
+                                                                            : tokens.color.neutralLight
+                                                                            }`,
+                                                                    }}
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell align="center">
+                                                                <Chip
+                                                                    label={
+                                                                        row.is_critical
+                                                                            ? 'CRITICAL'
+                                                                            : 'NON-CRITICAL'
+                                                                    }
+                                                                    size="small"
+                                                                    sx={{
+                                                                        fontWeight: tokens.weight.bold,
+                                                                        fontSize: '0.65rem',
+                                                                        borderRadius: tokens.radius.sm,
+                                                                        ...(row.is_critical
+                                                                            ? {
+                                                                                bgcolor:
+                                                                                    tokens.color.critical,
+                                                                                color: '#fff',
+                                                                            }
+                                                                            : {
+                                                                                bgcolor:
+                                                                                    tokens.color
+                                                                                        .neutralLighter,
+                                                                                color: tokens.color.textMuted,
+                                                                                border: `1px solid ${tokens.color.neutralLight}`,
+                                                                            }),
+                                                                    }}
+                                                                />
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
                                     </CardContent>
-                                </Card>
+                                </SectionCard>
                             </Grid>
                         )}
                     </Grid>
-                </Box>
+                )}
 
+                {/* 3 — Network Diagram */}
                 {tab === 3 && (
-                    <Box sx={{ height: '80vh', p: 2 }}>
-                        <NetworkDiagram tasks={cpmData} ref={networkRef} />
-                    </Box>
-                )}
-
-                {tab === 4 && (
-                    <Box>
-                        <TeamTab tasks={rawTasks} users={users} />
-                    </Box>
-                )}
-
-                {tab === 5 && (
-                    <Box>
-                        <MilestonesTab projectId={id} />
-                    </Box>
-                )}
-
-                {tab === 6 && (
-                    <Box>
-                        <BudgetTab projectId={id} startDate={project.start_date} endDate={project.end_date} />
-                    </Box>
-                )}
-
-                {tab === 7 && (
-                    <Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 800 }}>Analytics Dashboard</Typography>
+                    <SectionCard>
+                        {/* Network Diagram Header with Legend Toggle */}
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                px: 3,
+                                py: 2,
+                                borderBottom: `1px solid ${tokens.color.neutralLighter}`,
+                            }}
+                        >
+                            <Box>
+                                <Typography
+                                    variant="h6"
+                                    sx={{
+                                        fontWeight: tokens.weight.bold,
+                                        color: tokens.color.primary,
+                                    }}
+                                >
+                                    Network Diagram
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    sx={{ color: tokens.color.textMuted }}
+                                >
+                                    Task dependency visualization with critical path highlighting
+                                </Typography>
+                            </Box>
                             <Button
+                                size="small"
                                 variant="outlined"
-                                onClick={() => setAnalyticsKey(prev => prev + 1)}
-                                sx={{ borderRadius: 2, fontWeight: 600 }}
+                                onClick={() => setNetworkLegendVisible(!networkLegendVisible)}
+                                sx={{
+                                    borderRadius: tokens.radius.sm,
+                                    textTransform: 'none',
+                                    fontWeight: tokens.weight.semibold,
+                                    borderColor: tokens.color.neutralLight,
+                                    color: tokens.color.textSecondary,
+                                    '&:hover': {
+                                        borderColor: tokens.color.accent,
+                                        color: tokens.color.accent,
+                                    },
+                                }}
                             >
-                                Refresh
+                                {networkLegendVisible ? 'Hide Legend' : 'Show Legend'}
                             </Button>
                         </Box>
+                        {/* Dynamic height calculation to prevent double scrollbars */}
+                        <Box sx={{ height: 'calc(100vh - 280px)', minHeight: 500 }}>
+                            <NetworkDiagram
+                                tasks={cpmData}
+                                ref={refs.network}
+                                showLegend={networkLegendVisible}
+                            />
+                        </Box>
+                    </SectionCard>
+                )}
+
+                {/* 4 — Team */}
+                {tab === 4 && <TeamTab tasks={rawTasks} users={users} />}
+
+                {/* 5 — Milestones */}
+                {tab === 5 && <MilestonesTab projectId={id} />}
+
+                {/* 6 — Budget */}
+                {tab === 6 && (
+                    <BudgetTab
+                        projectId={id}
+                        startDate={project.start_date}
+                        endDate={project.end_date}
+                    />
+                )}
+
+                {/* 7 — Analytics (with Fullscreen support) */}
+                {tab === 7 && (
+                    <Box
+                        className={analyticsFullscreen ? 'analytics-fullscreen' : ''}
+                    >
+                        {/* Fullscreen Header (only visible in fullscreen mode) */}
+                        {analyticsFullscreen && (
+                            <Box className="fullscreen-header">
+                                <Typography
+                                    variant="subtitle1"
+                                    sx={{
+                                        fontWeight: tokens.weight.bold,
+                                        color: tokens.color.primary,
+                                    }}
+                                >
+                                    Analytics Dashboard — {project.name}
+                                </Typography>
+                                <Tooltip title="Exit fullscreen" arrow>
+                                    <IconButton
+                                        onClick={toggleAnalyticsFullscreen}
+                                        sx={{
+                                            color: tokens.color.textSecondary,
+                                            '&:hover': { color: tokens.color.critical },
+                                        }}
+                                    >
+                                        <FullscreenExitIcon />
+                                    </IconButton>
+                                </Tooltip>
+                            </Box>
+                        )}
+
+                        {/* Normal Header (hidden in fullscreen) */}
+                        {!analyticsFullscreen && (
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    mb: 3,
+                                }}
+                            >
+                                <Box>
+                                    <Typography
+                                        variant="h6"
+                                        sx={{
+                                            fontWeight: tokens.weight.bold,
+                                            color: tokens.color.primary,
+                                        }}
+                                    >
+                                        Analytics Dashboard
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        sx={{ color: tokens.color.textMuted }}
+                                    >
+                                        Embedded business intelligence view
+                                    </Typography>
+                                </Box>
+                                <Stack direction="row" spacing={1}>
+                                    <Tooltip title="Open fullscreen" arrow>
+                                        <IconButton
+                                            onClick={toggleAnalyticsFullscreen}
+                                            aria-label="Fullscreen analytics"
+                                            sx={{
+                                                border: `1px solid ${tokens.color.neutralLight}`,
+                                                borderRadius: tokens.radius.sm,
+                                                color: tokens.color.textSecondary,
+                                                '&:hover': {
+                                                    borderColor: tokens.color.accent,
+                                                    color: tokens.color.accent,
+                                                },
+                                            }}
+                                        >
+                                            <FullscreenIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Reload dashboard" arrow>
+                                        <IconButton
+                                            onClick={() => setAnalyticsKey((p) => p + 1)}
+                                            aria-label="Refresh analytics"
+                                            sx={{
+                                                border: `1px solid ${tokens.color.neutralLight}`,
+                                                borderRadius: tokens.radius.sm,
+                                                color: tokens.color.textSecondary,
+                                            }}
+                                        >
+                                            <RefreshIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Stack>
+                            </Box>
+                        )}
+
+                        {/* Content */}
                         {project.powerbi_embed_url ? (
-                            <iframe
-                                key={analyticsKey}
-                                title="Analytics Dashboard"
-                                width="100%"
-                                height="600"
-                                src={project.powerbi_embed_url}
-                                frameBorder="0"
-                                allowFullScreen={true}
-                            ></iframe>
+                            <SectionCard
+                                sx={
+                                    analyticsFullscreen
+                                        ? { border: 'none', boxShadow: 'none', borderRadius: 0 }
+                                        : {}
+                                }
+                            >
+                                <iframe
+                                    key={analyticsKey}
+                                    title="Analytics Dashboard"
+                                    width="100%"
+                                    height={analyticsFullscreen ? '100%' : '600'}
+                                    src={project.powerbi_embed_url}
+                                    frameBorder="0"
+                                    allowFullScreen
+                                    style={{ display: 'block' }}
+                                />
+                            </SectionCard>
                         ) : (
-                            <Typography>No Analytics Dashboard URL configured for this project.</Typography>
+                            <SectionCard
+                                sx={{
+                                    p: 6,
+                                    textAlign: 'center',
+                                    bgcolor: tokens.color.neutralLighter,
+                                }}
+                            >
+                                <InfoIcon
+                                    sx={{
+                                        fontSize: 48,
+                                        color: tokens.color.neutral,
+                                        mb: 2,
+                                    }}
+                                />
+                                <Typography
+                                    variant="h6"
+                                    sx={{
+                                        fontWeight: tokens.weight.semibold,
+                                        color: tokens.color.textSecondary,
+                                        mb: 0.5,
+                                    }}
+                                >
+                                    No Dashboard Configured
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    sx={{ color: tokens.color.textMuted }}
+                                >
+                                    Add a Power BI embed URL in project settings to see analytics
+                                    here.
+                                </Typography>
+                            </SectionCard>
                         )}
                     </Box>
                 )}
 
-                {tab === 8 && (
-                    <Box>
-                        <FileTree projectId={id} refreshTrigger={refreshTrigger} />
-                    </Box>
-                )}
+                {/* 8 — Files */}
+                {tab === 8 && <FileTree projectId={id} refreshTrigger={refreshTrigger} />}
             </Box>
 
+            {/* ─── Modals ──────────────────────────────────────── */}
             <TaskForm
                 open={openTaskForm}
                 onClose={() => setOpenTaskForm(false)}
@@ -686,7 +1674,6 @@ const ProjectDetails = () => {
                 projects={[{ id: project.id, name: project.name }]}
                 defaultProjectId={project.id}
             />
-
             <DeleteConfirmationModal
                 open={deleteModalOpen}
                 onClose={() => setDeleteModalOpen(false)}

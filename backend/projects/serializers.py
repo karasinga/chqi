@@ -5,10 +5,13 @@ import os
 class ProjectFileSerializer(serializers.ModelSerializer):
     file_name = serializers.SerializerMethodField()
     file_url = serializers.SerializerMethodField()
+    uploader_name = serializers.SerializerMethodField()
+
     
     class Meta:
         model = ProjectFile
-        fields = ['id', 'project', 'folder', 'file', 'file_name', 'file_url', 'file_type', 'file_size', 'uploaded_at']
+        fields = ['id', 'project', 'folder', 'file', 'file_name', 'file_url', 'file_type', 'file_size', 'uploaded_at', 'uploaded_by', 'uploader_name']
+
         read_only_fields = ['file_type', 'file_size']
     
     def get_file_name(self, obj):
@@ -20,6 +23,12 @@ class ProjectFileSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.file.url)
         return None
+
+    def get_uploader_name(self, obj):
+        if obj.uploaded_by:
+            return obj.uploaded_by.get_full_name() or obj.uploaded_by.username
+        return "Unknown"
+
 
 class FileFolderSerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()

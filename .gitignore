@@ -229,6 +229,7 @@ venv/
 # Dependencies
 node_modules/
 frontend/node_modules/
+backend/media/project_files/*
 
 # Build output
 dist/
