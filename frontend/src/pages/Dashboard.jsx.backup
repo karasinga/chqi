@@ -1,0 +1,909 @@
+import React, { useState, useEffect } from 'react';
+import {
+    Typography, Grid, Card, CardContent, CardActions, Button,
+    Box, IconButton, Chip, Stack, Paper, Divider, LinearProgress,
+    Tabs, Tab, Avatar, Tooltip, useTheme
+} from '@mui/material';
+import {
+    Add as AddIcon,
+    Delete as DeleteIcon,
+    Edit as EditIcon,
+    Assessment as AssessmentIcon,
+    Assignment as AssignmentIcon,
+    CheckCircle as CheckCircleIcon,
+    PauseCircle as PauseCircleIcon,
+    PlayCircle as PlayCircleIcon,
+    BarChart as BarChartIcon,
+    Dashboard as DashboardIcon,
+    TrendingUp as TrendingUpIcon,
+    Group as GroupIcon,
+    Notifications as NotificationsIcon,
+    ArrowForward as ArrowForwardIcon,
+    Schedule as ScheduleIcon,
+    ChatBubbleOutline as CommentIcon,
+    Search as SearchIcon,
+    FilterList as FilterListIcon
+} from '@mui/icons-material';
+import { Link, useNavigate } from 'react-router-dom';
+import ProjectForm from '../components/ProjectForm';
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+
+const Dashboard = () => {
+    const theme = useTheme();
+    const navigate = useNavigate();
+    const [projects, setProjects] = useState([]);
+    const [tasks, setTasks] = useState([]);
+    const [openForm, setOpenForm] = useState(false);
+    const [editingProject, setEditingProject] = useState(null);
+    const [activeTab, setActiveTab] = useState(0);
+    const [filter, setFilter] = useState('all');
+    const [activityLogs, setActivityLogs] = useState([]);
+    const [globalStats, setGlobalStats] = useState({ critical_path_tasks: 0, overdue_tasks: 0 });
+    const [activityFilter, setActivityFilter] = useState('all');
+    const [activityLimit, setActivityLimit] = useState(8);
+    const [myTasksFilter, setMyTasksFilter] = useState('mine');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [startDateFilter, setStartDateFilter] = useState('');
+    const [endDateFilter, setEndDateFilter] = useState('');
+
+    // Delete Modal State
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [projectToDelete, setProjectToDelete] = useState(null);
+
+    const fetchProjects = () => {
+        fetch('http://localhost:8000/api/projects/')
+            .then(res => res.json())
+            .then(data => setProjects(data))
+            .catch(err => console.error(err));
+    };
+
+    const fetchTasks = () => {
+        fetch('http://localhost:8000/api/pm/tasks/')
+            .then(res => res.json())
+            .then(data => setTasks(data))
+            .catch(err => console.error(err));
+    };
+
+    const fetchActivityLogs = () => {
+        fetch('http://localhost:8000/api/pm/activity/')
+            .then(res => res.json())
+            .then(data => setActivityLogs(data))
+            .catch(err => console.error(err));
+    };
+
+    const fetchGlobalStats = () => {
+        fetch('http://localhost:8000/api/pm/tasks/global_stats/')
+            .then(res => res.json())
+            .then(data => setGlobalStats(data))
+            .catch(err => console.error(err));
+    };
+
+    useEffect(() => {
+        fetchProjects();
+        fetchTasks();
+        fetchActivityLogs();
+        fetchGlobalStats();
+    }, []);
+
+    const calculateProgress = (project) => {
+        if (project.status === 'completed') return 100;
+        if (!project.start_date || !project.end_date) return 0;
+        const start = new Date(project.start_date);
+        const end = new Date(project.end_date);
+        const today = new Date();
+        if (today < start) return 0;
+        if (today > end) return 100;
+        const total = end - start;
+        const elapsed = today - start;
+        return Math.round((elapsed / total) * 100);
+    };
+
+    const filteredProjects = projects.filter(p => {
+        const matchesStatus = filter === 'all' || p.status === filter;
+        const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        let matchesDateRange = true;
+        if (startDateFilter && p.start_date) {
+            matchesDateRange = matchesDateRange && new Date(p.start_date) >= new Date(startDateFilter);
+        }
+        if (endDateFilter && p.end_date) {
+            matchesDateRange = matchesDateRange && new Date(p.end_date) <= new Date(endDateFilter);
+        }
+
+        return matchesStatus && matchesSearch && matchesDateRange;
+    });
+
+    const stats = {
+        total: filteredProjects.length,
+            : 'http://localhost:8000/api/projects/';
+
+fetch(url, {
+    method: method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(projectData)
+})
+    .then(() => {
+        setOpenForm(false);
+        setEditingProject(null);
+        fetchProjects();
+    });
+    };
+
+const handleDeleteClick = (project) => {
+    setProjectToDelete(project);
+    setDeleteModalOpen(true);
+};
+
+const handleConfirmDelete = () => {
+    if (projectToDelete) {
+        fetch(`http://localhost:8000/api/projects/${projectToDelete.id}/`, { method: 'DELETE' })
+            .then(() => {
+                fetchProjects();
+                setProjectToDelete(null);
+            });
+    }
+};
+
+return (
+    <Box sx={{ p: 1 }}>
+        {/* Premium Header */}
+        <Box sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 4,
+            p: 3,
+            borderRadius: 4,
+            background: 'linear-gradient(135deg, #1a237e 0%, #0d47a1 100%)',
+            color: 'white',
+            boxShadow: '0 8px 32px rgba(26, 35, 126, 0.2)'
+        }}>
+            <Box>
+                <Typography variant="h4" sx={{ fontWeight: 900, mb: 0.5, letterSpacing: -0.5 }}>
+                    Research Portfolio Dashboard
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.8, fontWeight: 500 }}>
+                    Welcome back! Here's what's happening across your research portfolio.
+                </Typography>
+            </Box>
+            <Stack direction="row" spacing={2}>
+                <Tooltip title="Notifications">
+                    <IconButton sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}>
+                        <NotificationsIcon />
+                    </IconButton>
+                </Tooltip>
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => { setEditingProject(null); setOpenForm(true); }}
+                    sx={{
+                        borderRadius: 3,
+                        px: 3,
+                        bgcolor: 'white',
+                        color: 'primary.main',
+                        fontWeight: 800,
+                        '&:hover': { bgcolor: '#f5f5f5' }
+                    }}
+                >
+                    New Project
+                </Button>
+            </Stack>
+        </Box>
+
+        {/* Premium Stats Widgets */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+            {[
+                {
+                    label: 'Active Projects',
+                    value: stats.active,
+                    icon: <AssignmentIcon />,
+                    color: '#4caf50',
+                    trend: `${stats.total} total`,
+                    bg: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)'
+                },
+                {
+                    label: 'Tasks in Progress',
+                    value: stats.tasksInProgress,
+                    icon: <TrendingUpIcon />,
+                    color: '#2196f3',
+                    trend: `${stats.tasksTodo} to do`,
+                    bg: 'linear-gradient(135deg, #2196f3 0%, #1565c0 100%)'
+                },
+                {
+                    label: 'Pending Review',
+                    value: tasks.filter(t => t.status === 'review').length,
+                    icon: <NotificationsIcon />,
+                    color: '#ff9800',
+                    trend: tasks.filter(t => t.status === 'review' && t.priority === 'critical').length > 0 ? `${tasks.filter(t => t.status === 'review' && t.priority === 'critical').length} critical` : 'None critical',
+                    bg: 'linear-gradient(135deg, #ff9800 0%, #ef6c00 100%)'
+                },
+                {
+                    label: 'Critical Path Tasks',
+                    value: globalStats.critical_path_tasks,
+                    icon: <GroupIcon />,
+                    color: '#9c27b0',
+                    trend: 'Impacts Timeline',
+                    bg: 'linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%)'
+                },
+            ].map((stat, index) => (
+                <Grid item xs={12} sm={6} md={3} key={index}>
+                    <Paper sx={{
+                        p: 3,
+                        borderRadius: 4,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        border: '1px solid #eee',
+                        background: 'white',
+                        transition: 'all 0.3s',
+                        '&:hover': {
+                            transform: 'translateY(-5px)',
+                            boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
+                            borderColor: stat.color
+                        }
+                    }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                            <Box sx={{
+                                p: 1.5,
+                                borderRadius: 3,
+                                background: stat.bg,
+                                color: 'white',
+                                boxShadow: `0 4px 12px ${stat.color}40`
+                            }}>
+                                {stat.icon}
+                            </Box>
+                            <Typography variant="caption" sx={{
+                                color: stat.color,
+                                fontWeight: 800,
+                                bgcolor: `${stat.color}10`,
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: 2,
+                                border: `1px solid ${stat.color}20`
+                            }}>
+                                {stat.trend}
+                            </Typography>
+                        </Box>
+                        <Typography variant="h3" sx={{ fontWeight: 900, mb: 0.5, color: '#1a237e' }}>{stat.value}</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: 1.2 }}>
+                            {stat.label}
+                        </Typography>
+                    </Paper>
+                </Grid>
+            ))}
+        </Grid>
+
+        {/* Main Content Area */}
+        <Grid container spacing={3}>
+            {/* Project List Section */}
+            <Grid item xs={12} lg={8}>
+                <Box sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 800 }}>Active Initiatives</Typography>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            {['all', 'active', 'on_hold', 'completed'].map((s) => {
+                                const statusColors = {
+                                    active: '#4caf50',
+                                    on_hold: '#ff9800',
+                                    completed: '#3f51b5',
+                                    all: theme.palette.primary.main
+                                };
+                                const statusLabels = {
+                                    active: 'ACTIVE',
+                                    on_hold: 'ON HOLD',
+                                    completed: 'COMPLETED',
+                                    all: 'ALL'
+                                };
+                                return (
+                                    <Chip
+                                        key={s}
+                                        label={statusLabels[s]}
+                                        onClick={() => setFilter(s)}
+                                        variant={filter === s ? 'filled' : 'outlined'}
+                                        sx={{
+                                            fontWeight: 800,
+                                            fontSize: '0.7rem',
+                                            bgcolor: filter === s ? statusColors[s] : 'transparent',
+                                            color: filter === s ? 'white' : statusColors[s],
+                                            borderColor: statusColors[s],
+                                            '&:hover': {
+                                                bgcolor: filter === s ? statusColors[s] : `${statusColors[s]}10`,
+                                            }
+                                        }}
+                                    />
+                                );
+                            })}
+                        </Box>
+                    </Box>
+
+                    <Paper sx={{ p: 1, display: 'flex', gap: 2, borderRadius: 3, border: '1px solid #eee', bgcolor: 'white' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', px: 2, flex: 1, bgcolor: '#f8f9fa', borderRadius: 2 }}>
+                            <SearchIcon sx={{ color: 'text.secondary', mr: 1, fontSize: '1.2rem' }} />
+                            <input
+                                placeholder="Search projects by name or description..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    width: '100%',
+                                    padding: '10px 0',
+                                    outline: 'none',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 500
+                                }}
+                            />
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', pr: 1 }}>
+                            <FilterListIcon sx={{ color: 'text.secondary', fontSize: '1.1rem' }} />
+                            {['all', 'high', 'medium', 'low'].map((p) => (
+                                <Chip
+                                    key={p}
+                                    label={p.toUpperCase()}
+                                    size="small"
+                                    onClick={() => setPriorityFilter(p)}
+                                    variant={priorityFilter === p ? 'filled' : 'outlined'}
+                                    color={priorityFilter === p ? 'primary' : 'default'}
+                                    sx={{ fontWeight: 700, fontSize: '0.65rem' }}
+                                />
+                            ))}
+                        </Box>
+                    </Paper>
+                </Box>
+                <Grid container spacing={2}>
+                    {filteredProjects.map(project => {
+                        const progress = calculateProgress(project);
+                        return (
+                            <Grid item xs={12} md={6} key={project.id}>
+                                <Card
+                                    onClick={() => navigate(`/projects/${project.id}`)}
+                                    sx={{
+                                        borderRadius: 4,
+                                        border: '1px solid #eee',
+                                        transition: 'all 0.3s',
+                                        cursor: 'pointer',
+                                        '&:hover': { boxShadow: 6, borderColor: 'primary.light' }
+                                    }}>
+                                    <CardContent sx={{ p: 3 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{project.name}</Typography>
+                                            <IconButton size="small" component={Link} to={`/projects/${project.id}`}>
+                                                <ArrowForwardIcon fontSize="small" />
+                                            </IconButton>
+                                        </Box>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3, height: '3em', overflow: 'hidden' }}>
+                                            {project.description || 'No description provided.'}
+                                        </Typography>
+                                        <Box sx={{ mb: 2 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 700 }}>Progress</Typography>
+                                                <Typography variant="caption" sx={{ fontWeight: 800 }}>{progress}%</Typography>
+                                            </Box>
+                                            <LinearProgress
+                                                variant="determinate"
+                                                value={progress}
+                                                sx={{
+                                                    height: 8,
+                                                    borderRadius: 4,
+                                                    bgcolor: '#f0f2f5',
+                                                    '& .MuiLinearProgress-bar': { borderRadius: 4 }
+                                                }}
+                                            />
+                                        </Box>
+                                        <Stack direction="row" spacing={1} sx={{ mt: 'auto' }}>
+                                            {(() => {
+                                                const statusColors = {
+                                                    active: '#4caf50',
+                                                    on_hold: '#ff9800',
+                                                    completed: '#3f51b5'
+                                                };
+                                                const statusLabels = {
+                                                    active: 'ACTIVE',
+                                                    on_hold: 'ON HOLD',
+                                                    completed: 'COMPLETED'
+                                                };
+                                                return (
+                                                    <Chip
+                                                        label={statusLabels[project.status] || project.status.toUpperCase()}
+                                                        size="small"
+                                                        sx={{
+                                                            fontWeight: 800,
+                                                            fontSize: '0.6rem',
+                                                            bgcolor: `${statusColors[project.status] || '#9e9e9e'}15`,
+                                                            color: statusColors[project.status] || '#9e9e9e',
+                                                            border: `1px solid ${statusColors[project.status] || '#9e9e9e'}30`
+                                                        }}
+                                                    />
+                                                );
+                                            })()}
+                                            <Chip icon={<ScheduleIcon sx={{ fontSize: '0.8rem !important' }} />} label={project.end_date || 'TBD'} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: '0.6rem' }} />
+                                            <Box sx={{ flexGrow: 1 }} />
+                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); setEditingProject(project); setOpenForm(true); }}>
+                                                <EditIcon fontSize="small" />
+                                            </IconButton>
+                                            <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleDeleteClick(project); }}>
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        </Stack>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        );
+                    })}
+                </Grid>
+            </Grid>
+
+            {/* Right Sidebar: Widgets */}
+            <Grid item xs={12} lg={4}>
+                <Box sx={{
+                    position: { lg: 'sticky' },
+                    top: { lg: 88 },
+                    maxHeight: { lg: 'calc(100vh - 110px)' },
+                    overflowY: { lg: 'auto' },
+                    pr: { lg: 1 },
+                    '&::-webkit-scrollbar': { width: 6 },
+                    '&::-webkit-scrollbar-thumb': { bgcolor: '#ddd', borderRadius: 3 },
+                    '&:hover::-webkit-scrollbar-thumb': { bgcolor: '#ccc' }
+                }}>
+                    <Stack spacing={3}>
+                        {/* Team Workload Overview */}
+                        <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #eee' }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2 }}>Team Workload</Typography>
+                            <Stack spacing={2}>
+                                {(() => {
+                                    const workload = tasks.reduce((acc, task) => {
+                                        if (task.status !== 'completed') {
+                                            const name = task.assignee_name || 'Unassigned';
+                                            acc[name] = (acc[name] || 0) + 1;
+                                        }
+                                        return acc;
+                                    }, {});
+                                    const totalActive = Object.values(workload).reduce((a, b) => a + b, 0);
+
+                                    return Object.entries(workload)
+                                        .sort((a, b) => b[1] - a[1])
+                                        .map(([name, count]) => (
+                                            <Box key={name}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Avatar sx={{ width: 20, height: 20, fontSize: '0.6rem', bgcolor: 'primary.main' }}>
+                                                            {name[0].toUpperCase()}
+                                                        </Avatar>
+                                                        <Typography variant="caption" sx={{ fontWeight: 700 }}>{name}</Typography>
+                                                    </Box>
+                                                    <Typography variant="caption" sx={{ fontWeight: 800 }}>{count} tasks</Typography>
+                                                </Box>
+                                                <LinearProgress
+                                                    variant="determinate"
+                                                    value={totalActive > 0 ? (count / totalActive) * 100 : 0}
+                                                    sx={{
+                                                        height: 6,
+                                                        borderRadius: 3,
+                                                        bgcolor: '#f0f2f5',
+                                                        '& .MuiLinearProgress-bar': {
+                                                            bgcolor: count > 5 ? '#ff5252' : count > 3 ? '#ff9800' : '#4caf50',
+                                                            borderRadius: 3
+                                                        }
+                                                    }}
+                                                />
+                                            </Box>
+                                        ));
+                                })()}
+                                {tasks.filter(t => t.status !== 'completed').length === 0 && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center' }}>
+                                        No active tasks assigned
+                                    </Typography>
+                                )}
+                            </Stack>
+                        </Paper>
+
+                        {/* Task Distribution Widget */}
+                        <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #eee' }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 3 }}>Task Distribution</Typography>
+                            <Stack spacing={2}>
+                                {[
+                                    { label: 'To Do', count: stats.tasksTodo, color: '#9e9e9e' },
+                                    { label: 'In Progress', count: stats.tasksInProgress, color: '#2196f3' },
+                                    { label: 'Review', count: tasks.filter(t => t.status === 'review').length, color: '#ff9800' },
+                                    { label: 'Completed', count: tasks.filter(t => t.status === 'completed').length, color: '#4caf50' },
+                                ].map((item, i) => (
+                                    <Box key={i}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 700 }}>{item.label}</Typography>
+                                            <Typography variant="caption" sx={{ fontWeight: 800 }}>{item.count}</Typography>
+                                        </Box>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={tasks.length > 0 ? (item.count / tasks.length) * 100 : 0}
+                                            sx={{
+                                                height: 6,
+                                                borderRadius: 3,
+                                                bgcolor: '#f0f2f5',
+                                                '& .MuiLinearProgress-bar': { bgcolor: item.color, borderRadius: 3 }
+                                            }}
+                                        />
+                                    </Box>
+                                ))}
+                            </Stack>
+                            <Button
+                                fullWidth
+                                component={Link}
+                                to="/tasks"
+                                sx={{ mt: 3, borderRadius: 2, fontWeight: 700 }}
+                                endIcon={<ArrowForwardIcon />}
+                            >
+                                View All Tasks
+                            </Button>
+                        </Paper>
+
+                        {/* My Tasks Widget */}
+                        <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #eee' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>My Tasks</Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Box sx={{ display: 'flex', gap: 0.5, mr: 1 }}>
+                                        {['mine', 'all'].map((f) => (
+                                            <Chip
+                                                key={f}
+                                                label={f === 'mine' ? 'Mine' : 'All'}
+                                                onClick={() => setMyTasksFilter(f)}
+                                                size="small"
+                                                variant={myTasksFilter === f ? 'filled' : 'outlined'}
+                                                color={myTasksFilter === f ? 'primary' : 'default'}
+                                                sx={{
+                                                    height: 20,
+                                                    fontSize: '0.6rem',
+                                                    fontWeight: 700,
+                                                    textTransform: 'uppercase'
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
+                                    <Chip
+                                        label={tasks.filter(t => {
+                                            const isMine = t.assignee_name === 'petman';
+                                            const isActive = t.status !== 'completed';
+                                            return isActive && (myTasksFilter === 'all' || isMine);
+                                        }).length}
+                                        size="small"
+                                        color="primary"
+                                        sx={{ fontWeight: 700 }}
+                                    />
+                                </Box>
+                            </Box>
+                            <Stack spacing={1.5}>
+                                {tasks
+                                    .filter(t => {
+                                        const isMine = t.assignee_name === 'petman';
+                                        const isActive = t.status !== 'completed';
+                                        return isActive && (myTasksFilter === 'all' || isMine);
+                                    })
+                                    .slice(0, 5)
+                                    .map((task) => (
+                                        <Box
+                                            key={task.id}
+                                            onClick={() => navigate(`/tasks?taskId=${task.id}`)}
+                                            sx={{
+                                                p: 1.5,
+                                                borderRadius: 2,
+                                                border: '1px solid #f0f0f0',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                                '&:hover': { bgcolor: '#f8f9fa', borderColor: 'primary.main', transform: 'translateX(4px)' }
+                                            }}
+                                        >
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 700, flex: 1, lineHeight: 1.3 }}>
+                                                    {task.name}
+                                                </Typography>
+                                                <Chip
+                                                    label={task.priority}
+                                                    size="small"
+                                                    sx={{
+                                                        height: 20,
+                                                        fontSize: '0.65rem',
+                                                        fontWeight: 700,
+                                                        bgcolor: task.priority === 'critical' ? '#ff5252' : task.priority === 'high' ? '#ff9800' : task.priority === 'medium' ? '#2196f3' : '#9e9e9e',
+                                                        color: 'white'
+                                                    }}
+                                                />
+                                            </Box>
+                                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                                                <Chip
+                                                    label={task.status.replace('_', ' ')}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    sx={{ height: 18, fontSize: '0.6rem', textTransform: 'capitalize' }}
+                                                />
+                                                {task.project_name && (
+                                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 600 }}>
+                                                        • {task.project_name}
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Stack direction="row" spacing={1.5} alignItems="center">
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                        <ScheduleIcon sx={{ fontSize: '0.8rem', color: 'text.secondary' }} />
+                                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                                            {task.start_date}
+                                                        </Typography>
+                                                    </Box>
+                                                    {(() => {
+                                                        const dueDate = new Date(task.start_date);
+                                                        dueDate.setDate(dueDate.getDate() + (task.duration || 0));
+                                                        const now = new Date();
+                                                        now.setHours(0, 0, 0, 0);
+                                                        const due = new Date(dueDate);
+                                                        due.setHours(0, 0, 0, 0);
+                                                        const diffTime = due - now;
+                                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                        const isOverdue = diffDays < 0;
+
+                                                        return (
+                                                            <Typography
+                                                                variant="caption"
+                                                                sx={{
+                                                                    fontSize: '0.65rem',
+                                                                    fontWeight: 700,
+                                                                    color: isOverdue ? 'error.main' : diffDays <= 3 ? 'warning.main' : 'text.secondary'
+                                                                }}
+                                                            >
+                                                                {isOverdue ? `Overdue (${Math.abs(diffDays)}d)` : diffDays === 0 ? 'Due today' : `${diffDays}d left`}
+                                                            </Typography>
+                                                        );
+                                                    })()}
+                                                </Stack>
+                                                {task.comment_count > 0 && (
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                        <CommentIcon sx={{ fontSize: '0.8rem', color: 'text.secondary' }} />
+                                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 700 }}>
+                                                            {task.comment_count}
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        </Box>
+                                    ))}
+                                {tasks.filter(t => {
+                                    const isMine = t.assignee_name === 'petman';
+                                    const isActive = t.status !== 'completed';
+                                    return isActive && (myTasksFilter === 'all' || isMine);
+                                }).length === 0 && (
+                                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
+                                            {myTasksFilter === 'mine' ? 'No active tasks assigned to you' : 'No active tasks found'}
+                                        </Typography>
+                                    )}
+                                {tasks.filter(t => {
+                                    const isMine = t.assignee_name === 'petman';
+                                    const isActive = t.status !== 'completed';
+                                    return isActive && (myTasksFilter === 'all' || isMine);
+                                }).length > 5 && (
+                                        <Button
+                                            fullWidth
+                                            size="small"
+                                            onClick={() => navigate('/tasks')}
+                                            sx={{ mt: 1, fontWeight: 600 }}
+                                        >
+                                            View All ({tasks.filter(t => {
+                                                const isMine = t.assignee_name === 'petman';
+                                                const isActive = t.status !== 'completed';
+                                                return isActive && (myTasksFilter === 'all' || isMine);
+                                            }).length} tasks)
+                                        </Button>
+                                    )}
+                            </Stack>
+                        </Paper>
+
+                        {/* Upcoming Deadlines Widget */}
+                        <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #eee' }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2 }}>Upcoming Deadlines</Typography>
+                            <Stack spacing={1.5}>
+                                {tasks
+                                    .filter(t => {
+                                        const dueDate = new Date(t.start_date);
+                                        dueDate.setDate(dueDate.getDate() + (t.duration || 0));
+                                        const now = new Date();
+                                        const diffTime = dueDate - now;
+                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                        return t.status !== 'completed' && diffDays <= 14;
+                                    })
+                                    .sort((a, b) => {
+                                        const dateA = new Date(a.start_date);
+                                        dateA.setDate(dateA.getDate() + (a.duration || 0));
+                                        const dateB = new Date(b.start_date);
+                                        dateB.setDate(dateB.getDate() + (b.duration || 0));
+                                        return dateA - dateB;
+                                    })
+                                    .slice(0, 5)
+                                    .map((task) => {
+                                        const dueDate = new Date(task.start_date);
+                                        dueDate.setDate(dueDate.getDate() + (task.duration || 0));
+                                        const now = new Date();
+                                        const diffTime = dueDate - now;
+                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                        const isOverdue = diffDays < 0;
+                                        const isDueSoon = diffDays <= 3;
+
+                                        return (
+                                            <Box
+                                                key={task.id}
+                                                onClick={() => navigate(`/tasks?taskId=${task.id}`)}
+                                                sx={{
+                                                    p: 1.5,
+                                                    borderRadius: 2,
+                                                    border: '1px solid #f0f0f0',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                    '&:hover': { bgcolor: '#f8f9fa', borderColor: isOverdue ? '#ff5252' : 'primary.main', transform: 'translateX(4px)' }
+                                                }}
+                                            >
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+                                                    <Typography variant="body2" sx={{ fontWeight: 700, flex: 1, lineHeight: 1.3 }}>
+                                                        {task.name}
+                                                    </Typography>
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{
+                                                            fontWeight: 800,
+                                                            color: isOverdue ? '#ff5252' : isDueSoon ? '#ff9800' : 'text.secondary'
+                                                        }}
+                                                    >
+                                                        {isOverdue ? 'Overdue' : `In ${diffDays} days`}
+                                                    </Typography>
+                                                </Box>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Due: {dueDate.toLocaleDateString()}
+                                                </Typography>
+                                            </Box>
+                                        );
+                                    })}
+                                {tasks.filter(t => {
+                                    const dueDate = new Date(t.start_date);
+                                    dueDate.setDate(dueDate.getDate() + (t.duration || 0));
+                                    const now = new Date();
+                                    const diffTime = dueDate - now;
+                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                    return t.status !== 'completed' && diffDays <= 14;
+                                }).length === 0 && (
+                                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
+                                            No upcoming deadlines
+                                        </Typography>
+                                    )}
+                            </Stack>
+                        </Paper>
+
+                        {/* Recent Activity Widget */}
+                        <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #eee' }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2 }}>Recent Activity</Typography>
+
+                            {/* Filter Chips */}
+                            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                                {['all', 'create', 'update', 'comment', 'assigned', 'status_change'].map((filterType) => (
+                                    <Chip
+                                        key={filterType}
+                                        label={filterType === 'all' ? 'All' : filterType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                        onClick={() => setActivityFilter(filterType)}
+                                        variant={activityFilter === filterType ? 'filled' : 'outlined'}
+                                        color={activityFilter === filterType ? 'primary' : 'default'}
+                                        size="small"
+                                        sx={{ fontWeight: 700, fontSize: '0.65rem', textTransform: 'capitalize' }}
+                                    />
+                                ))}
+                            </Box>
+
+                            <Stack spacing={2}>
+                                {activityLogs
+                                    .filter(log => activityFilter === 'all' || log.action === activityFilter)
+                                    .slice(0, activityLimit)
+                                    .map((log, i) => {
+                                        const getActionDetails = (action) => {
+                                            switch (action) {
+                                                case 'create': return { icon: <AssignmentIcon sx={{ fontSize: 16 }} />, color: '#4caf50', label: 'created' };
+                                                case 'update': return { icon: <TrendingUpIcon sx={{ fontSize: 16 }} />, color: '#2196f3', label: 'updated' };
+                                                case 'delete': return { icon: <DeleteIcon sx={{ fontSize: 16 }} />, color: '#f44336', label: 'deleted' };
+                                                case 'comment': return { icon: <NotificationsIcon sx={{ fontSize: 16 }} />, color: '#ff9800', label: 'commented on' };
+                                                case 'assigned': return { icon: <GroupIcon sx={{ fontSize: 16 }} />, color: '#9c27b0', label: 'assigned' };
+                                                case 'status_change': return { icon: <ScheduleIcon sx={{ fontSize: 16 }} />, color: '#00bcd4', label: 'moved' };
+                                                default: return { icon: <AssignmentIcon sx={{ fontSize: 16 }} />, color: '#757575', label: 'updated' };
+                                            }
+                                        };
+                                        const details = getActionDetails(log.action);
+                                        return (
+                                            <Box
+                                                key={i}
+                                                onClick={() => {
+                                                    if (['create', 'update', 'comment', 'assigned', 'status_change'].includes(log.action) && log.target_type === 'task') {
+                                                        navigate(`/tasks?taskId=${log.target_id}`);
+                                                    } else if (log.target_type === 'project' && log.target_id) {
+                                                        navigate(`/projects/${log.target_id}`);
+                                                    }
+                                                }}
+                                                sx={{
+                                                    display: 'flex',
+                                                    gap: 2,
+                                                    cursor: (log.target_type === 'task' || log.target_type === 'project') && log.target_id ? 'pointer' : 'default',
+                                                    '&:hover': { bgcolor: (log.target_type === 'task' || log.target_type === 'project') && log.target_id ? 'rgba(0, 0, 0, 0.04)' : 'transparent', borderRadius: 2, p: 0.5, mx: -0.5 }
+                                                }}
+                                            >
+                                                <Box sx={{ position: 'relative' }}>
+                                                    <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.light', fontSize: '0.8rem' }}>
+                                                        {log.username ? log.username[0].toUpperCase() : 'U'}
+                                                    </Avatar>
+                                                    <Box sx={{
+                                                        position: 'absolute',
+                                                        bottom: -4,
+                                                        right: -4,
+                                                        bgcolor: details.color,
+                                                        color: 'white',
+                                                        borderRadius: '50%',
+                                                        width: 18,
+                                                        height: 18,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        border: '2px solid white'
+                                                    }}>
+                                                        {details.icon}
+                                                    </Box>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                                                        {log.username || 'Someone'} {details.label} <span style={{ color: '#1a237e' }}>{log.target_name}</span>
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        );
+                                    })}
+                                {activityLogs.filter(log => activityFilter === 'all' || log.action === activityFilter).length === 0 && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>No activities found.</Typography>
+                                )}
+                            </Stack>
+
+                            {activityLogs.filter(log => activityFilter === 'all' || log.action === activityFilter).length > activityLimit ? (
+                                <Button
+                                    fullWidth
+                                    onClick={() => setActivityLimit(prev => prev + 10)}
+                                    sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }}
+                                >
+                                    Show More ({activityLogs.filter(log => activityFilter === 'all' || log.action === activityFilter).length - activityLimit} more)
+                                </Button>
+                            ) : activityLimit > 8 && (
+                                <Button
+                                    fullWidth
+                                    onClick={() => setActivityLimit(8)}
+                                    sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }}
+                                    variant="outlined"
+                                >
+                                    Show Less
+                                </Button>
+                            )}
+                        </Paper>
+                    </Stack>
+                </Box>
+            </Grid>
+        </Grid>
+
+        <ProjectForm
+            open={openForm}
+            onClose={() => setOpenForm(false)}
+            onSave={handleSave}
+            project={editingProject}
+        />
+
+        <DeleteConfirmationModal
+            open={deleteModalOpen}
+            onClose={() => { setDeleteModalOpen(false); setProjectToDelete(null); }}
+            onConfirm={handleConfirmDelete}
+            itemName={projectToDelete?.name || ''}
+        />
+    </Box >
+);
+};
+
+export default Dashboard;
