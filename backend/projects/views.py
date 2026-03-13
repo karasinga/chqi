@@ -53,7 +53,11 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
     queryset = ProjectFile.objects.all()
     serializer_class = ProjectFileSerializer
     
+    def perform_create(self, serializer):
+        serializer.save(uploaded_by=self.request.user)
+
     def get_queryset(self):
+
         queryset = ProjectFile.objects.all()
         project_id = self.request.query_params.get('project', None)
         folder_id = self.request.query_params.get('folder', None)

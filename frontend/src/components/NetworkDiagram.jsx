@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useState, useEffect, useRef, forwardRef } from 'react';
+// NetworkDiagram.js
+import React, { useCallback, useMemo, useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import ReactFlow, {
     useNodesState,
     useEdgesState,
@@ -12,14 +13,18 @@ import ReactFlow, {
     Panel,
     useReactFlow,
     ReactFlowProvider,
-    useNodesInitialized
+    useNodesInitialized,
+    getNodesBounds,
+    getViewportForBounds
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
 import {
     Box, Typography, Paper, Button, Select, MenuItem,
     FormControl, InputLabel, Stack, IconButton, Collapse, Tooltip, Divider, Chip,
-    Dialog, DialogTitle, DialogContent, DialogActions, Grid, TextField
+    Dialog, DialogTitle, DialogContent, DialogActions, Grid, TextField,
+    Drawer, Fab, Zoom, Fade, useTheme, alpha, Slider, Switch, FormControlLabel,
+    ToggleButton, ToggleButtonGroup, Badge
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -36,6 +41,16 @@ import SearchIcon from '@mui/icons-material/Search';
 import CenterFocusStrongIcon from '@mui/icons-material/CenterFocusStrong';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadIcon from '@mui/icons-material/Download';
+import TuneIcon from '@mui/icons-material/Tune';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
+import ZoomOutIcon from '@mui/icons-material/ZoomOut';
+import GridViewIcon from '@mui/icons-material/GridView';
+import LinearScaleIcon from '@mui/icons-material/LinearScale';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import { toPng } from 'html-to-image';
 
 // --- Custom Styles for Animations ---
@@ -46,6 +61,17 @@ const diagramStyles = `
   }
   to {
     stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 20px rgba(25, 118, 210, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 6px 30px rgba(25, 118, 210, 0.5);
   }
 }
 
@@ -74,6 +100,10 @@ const diagramStyles = `
 
 .edge-dimmed {
   opacity: 0.1 !important;
+}
+
+.fullscreen-btn-pulse {
+  animation: pulse 2s ease-in-out infinite;
 }
 `;
 
@@ -252,45 +282,477 @@ const getLayoutedElements = (nodes, edges, direction = 'LR', density = 'normal')
     return { nodes: layoutedNodes, edges };
 };
 
-const NetworkDiagramContent = ({ tasks, isFullScreen, onToggleFullScreen }) => {
+// --- Floating Toolbar Component ---
+const FloatingToolbar = ({
+    isFullScreen,
+    onToggleFullScreen,
+    onOpenSettings,
+    onFitView,
+    onDownload,
+    searchQuery,
+    onSearchChange,
+    onSearchClear
+}) => {
+    const [showSearch, setShowSearch] = useState(false);
+
+    return (
+        <Box
+            sx={{
+                position: 'absolute',
+                top: 16,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+            }}
+        >
+            <Fade in={true}>
+                <Paper
+                    elevation={8}
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                        p: 0.75,
+                        borderRadius: 3,
+                        bgcolor: 'rgba(255,255,255,0.95)',
+                        backdropFilter: 'blur(10px)',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                    }}
+                >
+                    {/* Search */}
+                    <Collapse in={showSearch} orientation="horizontal">
+                        <TextField
+                            size="small"
+                            placeholder="Search tasks..."
+                            value={searchQuery}
+                            onChange={(e) => onSearchChange(e.target.value)}
+                            sx={{
+                                width: 180,
+                                mr: 1,
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 2,
+                                    bgcolor: '#f5f5f5',
+                                }
+                            }}
+                            InputProps={{
+                                endAdornment: searchQuery && (
+                                    <IconButton size="small" onClick={onSearchClear}>
+                                        <CloseIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                ),
+                            }}
+                        />
+                    </Collapse>
+
+                    <Tooltip title="Search">
+                        <IconButton
+                            size="small"
+                            onClick={() => setShowSearch(!showSearch)}
+                            sx={{
+                                bgcolor: showSearch ? 'primary.light' : 'transparent',
+                                color: showSearch ? 'white' : 'inherit',
+                                '&:hover': { bgcolor: showSearch ? 'primary.main' : 'action.hover' }
+                            }}
+                        >
+                            <SearchIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+
+                    <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+                    <Tooltip title="Fit to View">
+                        <IconButton size="small" onClick={onFitView}>
+                            <CenterFocusStrongIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title="View Options">
+                        <IconButton size="small" onClick={onOpenSettings}>
+                            <TuneIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title="Download Image">
+                        <IconButton size="small" onClick={onDownload}>
+                            <DownloadIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+
+                    <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+                    <Tooltip title={isFullScreen ? "Exit Full Screen (Esc)" : "Full Screen"}>
+                        <IconButton
+                            size="small"
+                            onClick={onToggleFullScreen}
+                            sx={{
+                                bgcolor: isFullScreen ? 'error.main' : 'primary.main',
+                                color: 'white',
+                                '&:hover': {
+                                    bgcolor: isFullScreen ? 'error.dark' : 'primary.dark',
+                                    transform: 'scale(1.1)'
+                                },
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            {isFullScreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+                        </IconButton>
+                    </Tooltip>
+                </Paper>
+            </Fade>
+        </Box>
+    );
+};
+
+// --- Settings Drawer Component ---
+const SettingsDrawer = ({
+    open,
+    onClose,
+    direction,
+    onDirectionChange,
+    density,
+    onDensityChange,
+    onArrange,
+    onShowGuide
+}) => {
+    const theme = useTheme();
+
+    return (
+        <Drawer
+            anchor="right"
+            open={open}
+            onClose={onClose}
+            PaperProps={{
+                sx: {
+                    width: 320,
+                    borderRadius: '16px 0 0 16px',
+                    boxShadow: '-8px 0 32px rgba(0,0,0,0.1)',
+                }
+            }}
+            ModalProps={{
+                keepMounted: true,
+            }}
+        >
+            {/* Header */}
+            <Box
+                sx={{
+                    background: 'linear-gradient(135deg, #1a237e 0%, #3949ab 100%)',
+                    color: 'white',
+                    p: 3,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                }}
+            >
+                <Stack direction="row" spacing={2} alignItems="center">
+                    <TuneIcon />
+                    <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            View Options
+                        </Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                            Customize diagram layout
+                        </Typography>
+                    </Box>
+                </Stack>
+                <IconButton onClick={onClose} sx={{ color: 'white' }}>
+                    <CloseIcon />
+                </IconButton>
+            </Box>
+
+            {/* Content */}
+            <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {/* Layout Direction */}
+                <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: 'text.secondary' }}>
+                        LAYOUT DIRECTION
+                    </Typography>
+                    <ToggleButtonGroup
+                        value={direction}
+                        exclusive
+                        onChange={(e, val) => val && onDirectionChange(val)}
+                        fullWidth
+                        sx={{
+                            '& .MuiToggleButton-root': {
+                                py: 1.5,
+                                borderRadius: 2,
+                                '&.Mui-selected': {
+                                    bgcolor: 'primary.main',
+                                    color: 'white',
+                                    '&:hover': {
+                                        bgcolor: 'primary.dark',
+                                    }
+                                }
+                            }
+                        }}
+                    >
+                        <ToggleButton value="LR">
+                            <Stack alignItems="center" spacing={0.5}>
+                                <LinearScaleIcon />
+                                <Typography variant="caption">Horizontal</Typography>
+                            </Stack>
+                        </ToggleButton>
+                        <ToggleButton value="TB">
+                            <Stack alignItems="center" spacing={0.5}>
+                                <LinearScaleIcon sx={{ transform: 'rotate(90deg)' }} />
+                                <Typography variant="caption">Vertical</Typography>
+                            </Stack>
+                        </ToggleButton>
+                    </ToggleButtonGroup>
+                </Box>
+
+                {/* Node Density */}
+                <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: 'text.secondary' }}>
+                        NODE SPACING
+                    </Typography>
+                    <ToggleButtonGroup
+                        value={density}
+                        exclusive
+                        onChange={(e, val) => val && onDensityChange(val)}
+                        fullWidth
+                        sx={{
+                            '& .MuiToggleButton-root': {
+                                py: 1.5,
+                                borderRadius: 2,
+                                '&.Mui-selected': {
+                                    bgcolor: 'primary.main',
+                                    color: 'white',
+                                    '&:hover': {
+                                        bgcolor: 'primary.dark',
+                                    }
+                                }
+                            }
+                        }}
+                    >
+                        <ToggleButton value="compact">
+                            <Stack alignItems="center" spacing={0.5}>
+                                <GridViewIcon sx={{ fontSize: 20 }} />
+                                <Typography variant="caption">Compact</Typography>
+                            </Stack>
+                        </ToggleButton>
+                        <ToggleButton value="normal">
+                            <Stack alignItems="center" spacing={0.5}>
+                                <ViewModuleIcon sx={{ fontSize: 20 }} />
+                                <Typography variant="caption">Normal</Typography>
+                            </Stack>
+                        </ToggleButton>
+                        <ToggleButton value="relaxed">
+                            <Stack alignItems="center" spacing={0.5}>
+                                <AccountTreeIcon sx={{ fontSize: 20 }} />
+                                <Typography variant="caption">Spacious</Typography>
+                            </Stack>
+                        </ToggleButton>
+                    </ToggleButtonGroup>
+                </Box>
+
+                <Divider />
+
+                {/* Actions */}
+                <Button
+                    variant="contained"
+                    size="large"
+                    fullWidth
+                    startIcon={<RefreshIcon />}
+                    onClick={onArrange}
+                    sx={{
+                        borderRadius: 2,
+                        py: 1.5,
+                        fontWeight: 700,
+                        boxShadow: '0 4px 14px rgba(25, 118, 210, 0.4)',
+                    }}
+                >
+                    Apply & Arrange
+                </Button>
+
+                <Button
+                    variant="outlined"
+                    size="large"
+                    fullWidth
+                    startIcon={<HelpOutlineIcon />}
+                    onClick={onShowGuide}
+                    sx={{
+                        borderRadius: 2,
+                        py: 1.5,
+                        fontWeight: 600,
+                    }}
+                >
+                    CPM Guide
+                </Button>
+            </Box>
+
+            {/* Legend at Bottom */}
+            <Box sx={{ mt: 'auto', p: 3, bgcolor: '#f8f9fa', borderTop: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1.5 }}>
+                    LEGEND
+                </Typography>
+                <Stack spacing={1}>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Box sx={{ width: 16, height: 16, borderRadius: 1, bgcolor: 'primary.main' }} />
+                        <Typography variant="caption">ES / EF (Early Start/Finish)</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Box sx={{ width: 16, height: 16, borderRadius: 1, bgcolor: 'secondary.main' }} />
+                        <Typography variant="caption">LS / LF (Late Start/Finish)</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Box sx={{ width: 16, height: 16, borderRadius: 1, border: '2px dashed #d32f2f' }} />
+                        <Typography variant="caption">Critical Path (Zero Slack)</Typography>
+                    </Stack>
+                </Stack>
+            </Box>
+        </Drawer>
+    );
+};
+
+// --- Fullscreen Exit Button (Floating) ---
+const FullscreenExitButton = ({ onClick }) => (
+    <Zoom in={true}>
+        <Fab
+            color="error"
+            size="medium"
+            onClick={onClick}
+            sx={{
+                position: 'fixed',
+                bottom: 24,
+                right: 24,
+                zIndex: 1400,
+                boxShadow: '0 4px 20px rgba(211, 47, 47, 0.4)',
+                '&:hover': {
+                    transform: 'scale(1.1)',
+                }
+            }}
+        >
+            <FullscreenExitIcon />
+        </Fab>
+    </Zoom>
+);
+
+// --- Keyboard Shortcut Hook ---
+const useKeyboardShortcuts = (isFullScreen, onToggleFullScreen) => {
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Escape to exit fullscreen
+            if (e.key === 'Escape' && isFullScreen) {
+                onToggleFullScreen();
+            }
+            // F key to toggle fullscreen (when not in input)
+            if (e.key === 'f' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+                e.preventDefault();
+                onToggleFullScreen();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isFullScreen, onToggleFullScreen]);
+};
+
+// =====================================================
+// NetworkDiagramContent with forwardRef
+// =====================================================
+const NetworkDiagramContent = forwardRef(({ tasks, isFullScreen, onToggleFullScreen }, ref) => {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-    const { fitView } = useReactFlow();
+    const { fitView, zoomIn, zoomOut } = useReactFlow();
 
     const [direction, setDirection] = useState('LR');
     const [density, setDensity] = useState('compact');
-    const [isExpanded, setIsExpanded] = useState(false);
     const [hoveredNode, setHoveredNode] = useState(null);
     const [showGuide, setShowGuide] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isInitialLayoutDone, setIsInitialLayoutDone] = useState(false);
-    const reactFlowRef = useRef(null);
+    const [settingsOpen, setSettingsOpen] = useState(false);
 
-    const onDownload = useCallback(() => {
-        if (reactFlowRef.current === null) return;
+    const wrapperRef = useRef(null);
+    const { getNodes } = useReactFlow();
 
-        // Hide panels before capturing
-        const panels = reactFlowRef.current.querySelectorAll('.react-flow__panel');
-        panels.forEach(p => p.style.display = 'none');
+    // Keyboard shortcuts
+    useKeyboardShortcuts(isFullScreen, onToggleFullScreen);
 
-        toPng(reactFlowRef.current, {
-            cacheBust: true,
+    // =====================================================
+    // High-quality export
+    // =====================================================
+    const onDownload = useCallback((customFilename = null) => {
+        const element = wrapperRef.current;
+        if (!element) {
+            alert('Diagram not ready. Please wait for it to load.');
+            return;
+        }
+
+        const nodesList = getNodes();
+        if (nodesList.length === 0) {
+            alert('No nodes to export.');
+            return;
+        }
+
+        const nodesBounds = getNodesBounds(nodesList);
+        const padding = 150;
+        const scaleFactor = 2;
+
+        const imageWidth = (nodesBounds.width + padding * 2) * scaleFactor;
+        const imageHeight = (nodesBounds.height + padding * 2) * scaleFactor;
+
+        const translateX = (-nodesBounds.x + padding) * scaleFactor;
+        const translateY = (-nodesBounds.y + padding) * scaleFactor;
+
+        const viewportElement = element.querySelector('.react-flow__viewport');
+        if (!viewportElement) {
+            alert('Could not find the diagram viewport.');
+            return;
+        }
+
+        toPng(viewportElement, {
             backgroundColor: '#fcfcfc',
+            width: imageWidth,
+            height: imageHeight,
+            cacheBust: true,
+            pixelRatio: 1,
+            style: {
+                width: `${imageWidth}px`,
+                height: `${imageHeight}px`,
+                transform: `translate(${translateX}px, ${translateY}px) scale(${scaleFactor})`,
+                transformOrigin: 'top left',
+            },
+            filter: (node) => {
+                if (node?.classList) {
+                    if (
+                        node.classList.contains('react-flow__minimap') ||
+                        node.classList.contains('react-flow__controls') ||
+                        node.classList.contains('react-flow__panel') ||
+                        node.classList.contains('react-flow__attribution')
+                    ) {
+                        return false;
+                    }
+                }
+                return true;
+            },
         })
             .then((dataUrl) => {
                 const link = document.createElement('a');
-                link.download = `network-diagram-${new Date().getTime()}.png`;
+                link.download = customFilename || `network-diagram-${new Date().getTime()}.png`;
                 link.href = dataUrl;
+                document.body.appendChild(link);
                 link.click();
-                panels.forEach(p => p.style.display = 'flex');
+                document.body.removeChild(link);
             })
             .catch((err) => {
-                console.error('Download failed', err);
-                panels.forEach(p => p.style.display = 'flex');
+                console.error('Download failed:', err);
+                alert(`Export failed: ${err.message}`);
             });
-    }, [reactFlowRef]);
+    }, [getNodes]);
 
-    const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
+    useImperativeHandle(ref, () => ({
+        exportNetwork: onDownload
+    }), [onDownload]);
+
+    const onConnect = useCallback(
+        (params) => setEdges((eds) => addEdge(params, eds)),
+        [setEdges]
+    );
 
     const runLayout = useCallback((dir = direction, den = density) => {
         const layouted = getLayoutedElements(nodes, edges, dir, den);
@@ -299,16 +761,17 @@ const NetworkDiagramContent = ({ tasks, isFullScreen, onToggleFullScreen }) => {
         window.requestAnimationFrame(() => fitView({ duration: 800 }));
     }, [nodes, edges, setNodes, setEdges, fitView, direction, density]);
 
-    const handleDirectionChange = (e) => {
-        const newDir = e.target.value;
+    const handleDirectionChange = (newDir) => {
         setDirection(newDir);
-        runLayout(newDir, density);
     };
 
-    const handleDensityChange = (e) => {
-        const newDen = e.target.value;
+    const handleDensityChange = (newDen) => {
         setDensity(newDen);
-        runLayout(direction, newDen);
+    };
+
+    const handleArrange = () => {
+        runLayout(direction, density);
+        setSettingsOpen(false);
     };
 
     // --- Flow Highlighting Logic ---
@@ -322,8 +785,12 @@ const NetworkDiagramContent = ({ tasks, isFullScreen, onToggleFullScreen }) => {
 
     useEffect(() => {
         if (!hoveredNode) {
-            setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, isHovered: false, isDimmed: false } })));
-            setEdges((eds) => eds.map((e) => ({ ...e, className: e.data?.isCritical ? 'critical-edge' : '', opacity: 1 })));
+            setNodes((nds) => nds.map((n) => ({
+                ...n, data: { ...n.data, isHovered: false, isDimmed: false }
+            })));
+            setEdges((eds) => eds.map((e) => ({
+                ...e, className: e.data?.isCritical ? 'critical-edge' : '', opacity: 1
+            })));
             return;
         }
 
@@ -356,13 +823,16 @@ const NetworkDiagramContent = ({ tasks, isFullScreen, onToggleFullScreen }) => {
     // --- Search Logic ---
     useEffect(() => {
         if (!searchQuery) {
-            setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, isSearchMatch: false, isSearchDimmed: false } })));
+            setNodes((nds) => nds.map((n) => ({
+                ...n, data: { ...n.data, isSearchMatch: false, isSearchDimmed: false }
+            })));
             return;
         }
 
         const query = searchQuery.toLowerCase();
         setNodes((nds) => nds.map((n) => {
-            const isMatch = n.data?.label?.toLowerCase().includes(query) || String(n.data?.id).includes(query);
+            const isMatch = n.data?.label?.toLowerCase().includes(query) ||
+                String(n.data?.id).includes(query);
             return {
                 ...n,
                 data: {
@@ -374,9 +844,7 @@ const NetworkDiagramContent = ({ tasks, isFullScreen, onToggleFullScreen }) => {
         }));
     }, [searchQuery, setNodes]);
 
-    const handleSearchClear = () => {
-        setSearchQuery('');
-    };
+    const handleSearchClear = () => setSearchQuery('');
 
     useEffect(() => {
         if (tasks.length === 0) return;
@@ -428,20 +896,28 @@ const NetworkDiagramContent = ({ tasks, isFullScreen, onToggleFullScreen }) => {
             }
         });
 
-        initialNodes.push({ id: 'start', type: 'startNode', data: { label: 'Start' }, position: { x: 0, y: 0 } });
-        initialNodes.push({ id: 'end', type: 'endNode', data: { label: 'End' }, position: { x: 0, y: 0 } });
+        initialNodes.push({
+            id: 'start', type: 'startNode',
+            data: { label: 'Start' }, position: { x: 0, y: 0 }
+        });
+        initialNodes.push({
+            id: 'end', type: 'endNode',
+            data: { label: 'End' }, position: { x: 0, y: 0 }
+        });
 
         tasks.forEach(t => {
             if (!hasPredecessors.has(t.id)) {
                 initialEdges.push({
-                    id: `estart-${t.id}`, source: 'start', target: String(t.id), type: 'smoothstep',
+                    id: `estart-${t.id}`, source: 'start', target: String(t.id),
+                    type: 'smoothstep',
                     style: { stroke: '#4caf50', strokeWidth: 2, strokeDasharray: '5,5' },
                     markerEnd: { type: MarkerType.ArrowClosed, color: '#4caf50' },
                 });
             }
             if (!hasSuccessors.has(t.id)) {
                 initialEdges.push({
-                    id: `e${t.id}-end`, source: String(t.id), target: 'end', type: 'smoothstep',
+                    id: `e${t.id}-end`, source: String(t.id), target: 'end',
+                    type: 'smoothstep',
                     style: { stroke: '#f44336', strokeWidth: 2, strokeDasharray: '5,5' },
                     markerEnd: { type: MarkerType.ArrowClosed, color: '#f44336' },
                 });
@@ -456,7 +932,6 @@ const NetworkDiagramContent = ({ tasks, isFullScreen, onToggleFullScreen }) => {
 
     const nodesInitialized = useNodesInitialized();
 
-    // Separate effect for fitting the view once nodes are fully rendered and initialized
     useEffect(() => {
         if (isInitialLayoutDone && nodesInitialized && nodes.length > 0) {
             const timer = setTimeout(() => {
@@ -466,14 +941,46 @@ const NetworkDiagramContent = ({ tasks, isFullScreen, onToggleFullScreen }) => {
         }
     }, [isInitialLayoutDone, nodesInitialized, nodes.length, fitView]);
 
-    // Re-fit view when full screen is toggled
     useEffect(() => {
         setTimeout(() => fitView({ duration: 800, padding: 0.2 }), 100);
     }, [isFullScreen, fitView]);
 
     return (
-        <Box ref={reactFlowRef} sx={{ width: '100%', height: '100%', position: 'relative' }}>
+        <Box ref={wrapperRef} sx={{ width: '100%', height: '100%', position: 'relative' }}>
             <style>{diagramStyles}</style>
+
+            {/* Floating Toolbar */}
+            <FloatingToolbar
+                isFullScreen={isFullScreen}
+                onToggleFullScreen={onToggleFullScreen}
+                onOpenSettings={() => setSettingsOpen(true)}
+                onFitView={() => fitView({ duration: 800, padding: 0.2 })}
+                onDownload={() => onDownload()}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                onSearchClear={handleSearchClear}
+            />
+
+            {/* Settings Drawer */}
+            <SettingsDrawer
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+                direction={direction}
+                onDirectionChange={handleDirectionChange}
+                density={density}
+                onDensityChange={handleDensityChange}
+                onArrange={handleArrange}
+                onShowGuide={() => {
+                    setSettingsOpen(false);
+                    setShowGuide(true);
+                }}
+            />
+
+            {/* Fullscreen Exit FAB */}
+            {isFullScreen && (
+                <FullscreenExitButton onClick={onToggleFullScreen} />
+            )}
+
             <ReactFlow
                 nodes={nodes} edges={edges}
                 onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
@@ -481,212 +988,153 @@ const NetworkDiagramContent = ({ tasks, isFullScreen, onToggleFullScreen }) => {
                 onNodeMouseEnter={onNodeMouseEnter}
                 onNodeMouseLeave={onNodeMouseLeave}
                 attributionPosition="bottom-right"
+                fitView
             >
-                <Controls />
-                <MiniMap nodeStrokeWidth={3} zoomable pannable />
+                <Controls position="bottom-left" />
+                <MiniMap
+                    nodeStrokeWidth={3}
+                    zoomable
+                    pannable
+                    position="bottom-right"
+                    style={{
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 8,
+                    }}
+                />
                 <Background variant="dots" gap={20} size={1} color="#e0e0e0" />
-
-                {/* Legend Panel */}
-                <Panel position="bottom-left">
-                    <Paper elevation={4} sx={{ p: 1.5, borderRadius: 2, border: '1px solid #eee', bgcolor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)' }}>
-                        <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary', display: 'block', mb: 1 }}>LEGEND</Typography>
-                        <Stack spacing={0.5}>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                                <Box sx={{ width: 12, height: 12, borderRadius: '2px', bgcolor: 'primary.main' }} />
-                                <Typography variant="caption">ES / EF (Early Start/Finish)</Typography>
-                            </Stack>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                                <Box sx={{ width: 12, height: 12, borderRadius: '2px', bgcolor: 'secondary.main' }} />
-                                <Typography variant="caption">LS / LF (Late Start/Finish)</Typography>
-                            </Stack>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                                <Box sx={{ width: 12, height: 12, borderRadius: '2px', border: '2px dashed #d32f2f' }} />
-                                <Typography variant="caption">Critical Path</Typography>
-                            </Stack>
-                        </Stack>
-                    </Paper>
-                </Panel>
-
-                <Panel position="top-right">
-                    <Paper elevation={6} sx={{ border: '1px solid #ddd', borderRadius: 3, overflow: 'hidden', minWidth: 220, boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
-                        <Box
-                            sx={{
-                                background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)',
-                                color: 'white', px: 2, py: 1.5,
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                cursor: 'pointer'
-                            }}
-                            onClick={() => setIsExpanded(!isExpanded)}
-                        >
-                            <Stack direction="row" spacing={1.5} alignItems="center">
-                                <SettingsIcon fontSize="small" />
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800, letterSpacing: 0.5 }}>VIEW OPTIONS</Typography>
-                            </Stack>
-                            <IconButton size="small" sx={{ color: 'white' }}>
-                                {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                            </IconButton>
-                        </Box>
-                        <Collapse in={isExpanded}>
-                            <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5, bgcolor: 'background.paper' }}>
-                                <Box sx={{ position: 'relative' }}>
-                                    <TextField
-                                        size="small"
-                                        fullWidth
-                                        placeholder="Search task..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        InputProps={{
-                                            startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1, fontSize: 20 }} />,
-                                            endAdornment: searchQuery && (
-                                                <IconButton size="small" onClick={handleSearchClear}>
-                                                    <CloseIcon sx={{ fontSize: 16 }} />
-                                                </IconButton>
-                                            ),
-                                            sx: { borderRadius: 2, bgcolor: '#f8f9fa' }
-                                        }}
-                                    />
-                                </Box>
-                                <FormControl size="small" fullWidth>
-                                    <InputLabel>Layout Direction</InputLabel>
-                                    <Select value={direction} label="Layout Direction" onChange={handleDirectionChange}>
-                                        <MenuItem value="LR">Horizontal Flow</MenuItem>
-                                        <MenuItem value="TB">Vertical Flow</MenuItem>
-                                    </Select>
-                                </FormControl>
-                                <FormControl size="small" fullWidth>
-                                    <InputLabel>Node Density</InputLabel>
-                                    <Select value={density} label="Node Density" onChange={handleDensityChange}>
-                                        <MenuItem value="compact">Compact View</MenuItem>
-                                        <MenuItem value="normal">Standard View</MenuItem>
-                                        <MenuItem value="relaxed">Spacious View</MenuItem>
-                                    </Select>
-                                </FormControl>
-                                <Stack direction="row" spacing={1}>
-                                    <Button
-                                        variant="contained" size="medium" fullWidth
-                                        startIcon={<RefreshIcon />} onClick={() => runLayout(direction, density)}
-                                        sx={{
-                                            borderRadius: 2,
-                                            fontWeight: 700,
-                                            boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)'
-                                        }}
-                                    >
-                                        Arrange
-                                    </Button>
-                                    <Tooltip title="Reset View">
-                                        <Button
-                                            variant="outlined"
-                                            onClick={() => fitView({ duration: 800, padding: 0.2 })}
-                                            sx={{ borderRadius: 2, minWidth: 48, p: 0 }}
-                                        >
-                                            <CenterFocusStrongIcon />
-                                        </Button>
-                                    </Tooltip>
-                                </Stack>
-                                <Button
-                                    variant="outlined" size="small" fullWidth
-                                    startIcon={<HelpOutlineIcon />} onClick={() => setShowGuide(true)}
-                                    sx={{ borderRadius: 2, fontWeight: 600 }}
-                                >
-                                    CPM Guide
-                                </Button>
-                                <Button
-                                    variant="outlined" size="small" fullWidth
-                                    startIcon={isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-                                    onClick={onToggleFullScreen}
-                                    sx={{ borderRadius: 2, fontWeight: 600 }}
-                                >
-                                    {isFullScreen ? 'Exit Full Screen' : 'Full Screen'}
-                                </Button>
-                                <Button
-                                    variant="contained" size="small" fullWidth
-                                    startIcon={<DownloadIcon />}
-                                    onClick={onDownload}
-                                    sx={{ borderRadius: 2, fontWeight: 700, mt: 1 }}
-                                >
-                                    Download Image
-                                </Button>
-                            </Box>
-                        </Collapse>
-                    </Paper>
-                </Panel>
             </ReactFlow>
 
             {/* CPM Guide Dialog */}
-            <Dialog open={showGuide} onClose={() => setShowGuide(false)} maxWidth="md" fullWidth>
-                <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', fontWeight: 800 }}>
-                    Critical Path Method (CPM) Guide
+            <Dialog
+                open={showGuide}
+                onClose={() => setShowGuide(false)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: { borderRadius: 3 }
+                }}
+            >
+                <DialogTitle sx={{
+                    background: 'linear-gradient(135deg, #1a237e 0%, #3949ab 100%)',
+                    color: 'white',
+                    fontWeight: 800
+                }}>
+                    <Stack direction="row" alignItems="center" spacing={2}>
+                        <HelpOutlineIcon />
+                        <span>Critical Path Method (CPM) Guide</span>
+                    </Stack>
                 </DialogTitle>
                 <DialogContent dividers>
                     <Stack spacing={3} sx={{ py: 1 }}>
                         <Box>
-                            <Typography variant="h6" color="primary" gutterBottom sx={{ fontWeight: 700 }}>1. What is CPM?</Typography>
+                            <Typography variant="h6" color="primary" gutterBottom sx={{ fontWeight: 700 }}>
+                                1. What is CPM?
+                            </Typography>
                             <Typography variant="body2">
-                                The <strong>Critical Path Method (CPM)</strong> identifies the most important tasks in a project. It determines the <strong>shortest possible time</strong> to complete a project and which tasks are "critical"—meaning if they slip, the entire project is delayed.
+                                The <strong>Critical Path Method (CPM)</strong> identifies the most important tasks in a project.
+                                It determines the <strong>shortest possible time</strong> to complete a project and which tasks
+                                are "critical"—meaning if they slip, the entire project is delayed.
                             </Typography>
                         </Box>
-
                         <Box>
-                            <Typography variant="h6" color="primary" gutterBottom sx={{ fontWeight: 700 }}>2. Key Metrics</Typography>
+                            <Typography variant="h6" color="primary" gutterBottom sx={{ fontWeight: 700 }}>
+                                2. Key Metrics
+                            </Typography>
                             <Grid container spacing={2}>
                                 <Grid item xs={6}>
-                                    <Typography variant="subtitle2" color="success.main" sx={{ fontWeight: 700 }}>Early Start (ES) / Finish (EF)</Typography>
-                                    <Typography variant="caption">The "Best Case" schedule. Earliest a task can start and end.</Typography>
+                                    <Paper sx={{ p: 2, bgcolor: '#e3f2fd', borderRadius: 2 }}>
+                                        <Typography variant="subtitle2" color="primary.dark" sx={{ fontWeight: 700 }}>
+                                            Early Start (ES) / Finish (EF)
+                                        </Typography>
+                                        <Typography variant="caption">
+                                            The "Best Case" schedule. Earliest a task can start and end.
+                                        </Typography>
+                                    </Paper>
                                 </Grid>
                                 <Grid item xs={6}>
-                                    <Typography variant="subtitle2" color="secondary.main" sx={{ fontWeight: 700 }}>Late Start (LS) / Finish (LF)</Typography>
-                                    <Typography variant="caption">The "Last Minute" schedule. Latest a task can end without delaying the project.</Typography>
+                                    <Paper sx={{ p: 2, bgcolor: '#fce4ec', borderRadius: 2 }}>
+                                        <Typography variant="subtitle2" color="secondary.dark" sx={{ fontWeight: 700 }}>
+                                            Late Start (LS) / Finish (LF)
+                                        </Typography>
+                                        <Typography variant="caption">
+                                            The "Last Minute" schedule. Latest a task can end without delaying the project.
+                                        </Typography>
+                                    </Paper>
                                 </Grid>
                             </Grid>
                         </Box>
-
                         <Box sx={{ p: 2, bgcolor: '#fff3e0', borderRadius: 2, border: '1px solid #ffe0b2' }}>
-                            <Typography variant="h6" color="#e65100" gutterBottom sx={{ fontWeight: 700 }}>3. Slack (Float)</Typography>
+                            <Typography variant="h6" color="#e65100" gutterBottom sx={{ fontWeight: 700 }}>
+                                3. Slack (Float)
+                            </Typography>
                             <Typography variant="body2">
-                                <strong>Slack</strong> is your "breathing room." It's the amount of time a task can be delayed without affecting the project's end date.
+                                <strong>Slack</strong> is your "breathing room." It's the amount of time a task can be
+                                delayed without affecting the project's end date.
                                 <br />
                                 <strong>Formula:</strong> LS - ES = Slack.
                             </Typography>
                         </Box>
-
                         <Box sx={{ p: 2, bgcolor: '#ffebee', borderRadius: 2, border: '1px solid #ffcdd2' }}>
-                            <Typography variant="h6" color="#d32f2f" gutterBottom sx={{ fontWeight: 700 }}>4. The Critical Path</Typography>
+                            <Typography variant="h6" color="#d32f2f" gutterBottom sx={{ fontWeight: 700 }}>
+                                4. The Critical Path
+                            </Typography>
                             <Typography variant="body2">
-                                The sequence of tasks with <strong>Zero Slack</strong>. These are the bottlenecks. In this diagram, they are highlighted in <strong>Red</strong> with <strong>Animated Lines</strong>.
+                                The sequence of tasks with <strong>Zero Slack</strong>. These are the bottlenecks.
+                                In this diagram, they are highlighted in <strong>Red</strong> with <strong>Animated Lines</strong>.
                             </Typography>
                         </Box>
-
                         <Box>
-                            <Typography variant="h6" color="primary" gutterBottom sx={{ fontWeight: 700 }}>5. Pro Tips</Typography>
-                            <Typography variant="body2" component="div">
-                                <ul>
-                                    <li><strong>Focus on Red:</strong> Manage critical tasks first.</li>
-                                    <li><strong>Watch Near-Critical:</strong> Tasks with 1-2 days of slack can easily become critical.</li>
-                                    <li><strong>Hover to Trace:</strong> Hover over any node to see its direct dependencies highlighted.</li>
-                                </ul>
+                            <Typography variant="h6" color="primary" gutterBottom sx={{ fontWeight: 700 }}>
+                                5. Keyboard Shortcuts
                             </Typography>
+                            <Stack direction="row" spacing={2}>
+                                <Chip label="F" variant="outlined" size="small" />
+                                <Typography variant="body2">Toggle Full Screen</Typography>
+                            </Stack>
+                            <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                                <Chip label="Esc" variant="outlined" size="small" />
+                                <Typography variant="body2">Exit Full Screen</Typography>
+                            </Stack>
                         </Box>
                     </Stack>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setShowGuide(false)} variant="contained">Got it!</Button>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setShowGuide(false)} variant="contained" sx={{ borderRadius: 2 }}>
+                        Got it!
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>
     );
-};
+});
 
+// =====================================================
+// NetworkDiagram wrapper with proper ref chain
+// =====================================================
 const NetworkDiagram = forwardRef(({ tasks }, ref) => {
     const [isFullScreen, setIsFullScreen] = useState(false);
+    const contentRef = useRef(null);
+
+    useImperativeHandle(ref, () => ({
+        exportNetwork: (filename) => {
+            if (contentRef.current && contentRef.current.exportNetwork) {
+                contentRef.current.exportNetwork(filename);
+            } else {
+                console.warn('NetworkDiagramContent ref not available');
+            }
+        }
+    }), []);
+
+    const toggleFullScreen = useCallback(() => {
+        setIsFullScreen(prev => !prev);
+    }, []);
 
     return (
-        <Box ref={ref} sx={isFullScreen ? {
+        <Box sx={isFullScreen ? {
             position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            zIndex: 1300, // Above MUI AppBars but below Dialogs
+            top: 0, left: 0,
+            width: '100vw', height: '100vh',
+            zIndex: 1300,
             bgcolor: '#fcfcfc'
         } : {
             height: 700,
@@ -700,9 +1148,10 @@ const NetworkDiagram = forwardRef(({ tasks }, ref) => {
         }}>
             <ReactFlowProvider>
                 <NetworkDiagramContent
+                    ref={contentRef}
                     tasks={tasks}
                     isFullScreen={isFullScreen}
-                    onToggleFullScreen={() => setIsFullScreen(!isFullScreen)}
+                    onToggleFullScreen={toggleFullScreen}
                 />
             </ReactFlowProvider>
         </Box>
