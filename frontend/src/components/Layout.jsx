@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     AppBar, Toolbar, Typography, Box, Drawer, List, ListItem,
     ListItemIcon, ListItemText, IconButton, useTheme, useMediaQuery,
     Avatar, Divider, Tooltip, Badge, InputBase, Chip, Button,
-    Fade, Snackbar, Alert
+    Fade, Snackbar, Alert, Menu, MenuItem, ListSubheader, Paper, ClickAwayListener
 } from '@mui/material';
 import {
     Menu as MenuIcon,
@@ -15,9 +15,7 @@ import {
     ChevronRight as ChevronRightIcon,
     Logout as LogoutIcon,
     Search as SearchIcon,
-    Notifications as NotificationsIcon,
-    DarkMode as DarkModeIcon,
-    LightMode as LightModeIcon
+    Notifications as NotificationsIcon
 } from '@mui/icons-material';
 import { Link, useLocation } from 'react-router-dom';
 import { keyframes } from '@mui/system';
@@ -25,6 +23,7 @@ import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { colors } from '../theme/colors';
+import { useNavigate } from 'react-router-dom';
 
 // Animations
 const pulse = keyframes`
@@ -40,9 +39,52 @@ const Layout = ({ children }) => {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [mobileOpen, setMobileOpen] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
-    const [darkMode, setDarkMode] = useState(false);
+
+    // Navigation
     const location = useLocation();
+    const navigate = useNavigate();
     const { user, logout } = useAuth();
+
+    // Search Ref & OS Detection
+    const searchInputRef = useRef(null);
+    const [searchShortcut, setSearchShortcut] = useState('⌘K');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchFocused, setSearchFocused] = useState(false);
+
+    const searchOptions = [
+        { title: 'Dashboard', path: '/', icon: <DashboardIcon fontSize="small" /> },
+        { title: 'Tasks Management', path: '/tasks', icon: <AssignmentIcon fontSize="small" /> },
+        { title: 'Portfolio Dashboard', path: '/portfolio', icon: <TrendingUpIcon fontSize="small" /> },
+        { title: 'User Settings', path: '/settings', icon: <SettingsIcon fontSize="small" /> },
+    ];
+
+    const filteredSearch = searchOptions.filter(opt => opt.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const handleSearchSelect = (path) => {
+        navigate(path);
+        setSearchQuery('');
+        setSearchFocused(false);
+        searchInputRef.current?.blur();
+    };
+
+    useEffect(() => {
+        // More robust platform detection string check
+        const isMac = typeof window !== 'undefined' &&
+            (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ||
+                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0);
+
+        setSearchShortcut(isMac ? '⌘K' : 'Ctrl+K');
+
+        const handleKeyDown = (e) => {
+            if ((isMac ? e.metaKey : e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     // Welcome toast state
     const [showWelcome, setShowWelcome] = useState(false);
@@ -59,6 +101,24 @@ const Layout = ({ children }) => {
     const handleCloseWelcome = () => {
         setShowWelcome(false);
     };
+
+    // Notifications Menu State
+    const [anchorElNav, setAnchorElNav] = useState(null);
+    const notificationsOpen = Boolean(anchorElNav);
+
+    const handleOpenNotifications = (event) => {
+        setAnchorElNav(event.currentTarget);
+    };
+
+    const handleCloseNotifications = () => {
+        setAnchorElNav(null);
+    };
+
+    const dummyNotifications = [
+        { id: 1, text: 'New task assigned to you', time: '5m ago', unread: true },
+        { id: 2, text: 'Portfolio performance updated', time: '1h ago', unread: true },
+        { id: 3, text: 'System maintenance scheduled', time: '2h ago', unread: false }
+    ];
 
     const { data: onlineCountData } = useQuery({
         queryKey: ['onlineCount'],
@@ -472,69 +532,118 @@ const Layout = ({ children }) => {
                         </IconButton>
 
                         {/* Search Bar */}
-                        <Box sx={{
-                            display: { xs: 'none', sm: 'flex' },
-                            alignItems: 'center',
-                            gap: 1.5,
-                            bgcolor: colors.navyLighter,
-                            borderRadius: 2.5,
-                            px: 2,
-                            py: 1,
-                            minWidth: 300,
-                            transition: 'all 0.2s ease',
-                            border: '2px solid transparent',
-                            '&:focus-within': {
-                                bgcolor: '#fff',
-                                borderColor: colors.teal,
-                                boxShadow: `0 0 0 3px ${colors.teal}20`
-                            }
-                        }}>
-                            <SearchIcon sx={{ color: colors.gray, fontSize: 20 }} />
-                            <InputBase
-                                placeholder="Search anything..."
-                                sx={{
-                                    flex: 1,
-                                    fontSize: '0.875rem',
-                                    color: colors.navy,
-                                    '& input::placeholder': {
-                                        color: colors.gray,
-                                        opacity: 1
-                                    }
-                                }}
-                            />
-                            <Chip
-                                label="⌘K"
-                                size="small"
-                                sx={{
-                                    height: 22,
-                                    fontSize: '0.7rem',
-                                    fontWeight: 600,
-                                    bgcolor: colors.grayLight,
-                                    color: colors.navy
-                                }}
-                            />
-                        </Box>
+                        <ClickAwayListener onClickAway={() => setSearchFocused(false)}>
+                            <Box sx={{
+                                display: { xs: 'none', sm: 'flex' },
+                                alignItems: 'center',
+                                gap: 1.5,
+                                bgcolor: colors.navyLighter,
+                                borderRadius: 2.5,
+                                px: 2,
+                                py: 1,
+                                minWidth: 300,
+                                transition: 'all 0.2s ease',
+                                border: '2px solid transparent',
+                                position: 'relative',
+                                '&:focus-within': {
+                                    bgcolor: '#fff',
+                                    borderColor: colors.teal,
+                                    boxShadow: `0 0 0 3px ${colors.teal}20`
+                                }
+                            }}>
+                                <SearchIcon sx={{ color: colors.gray, fontSize: 20 }} />
+                                <InputBase
+                                    inputRef={searchInputRef}
+                                    placeholder="Search anything..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onFocus={() => setSearchFocused(true)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && filteredSearch.length > 0) {
+                                            handleSearchSelect(filteredSearch[0].path);
+                                        }
+                                    }}
+                                    sx={{
+                                        flex: 1,
+                                        fontSize: '0.875rem',
+                                        color: colors.navy,
+                                        '& input::placeholder': {
+                                            color: colors.gray,
+                                            opacity: 1
+                                        }
+                                    }}
+                                />
+                                <Chip
+                                    label={searchShortcut}
+                                    size="small"
+                                    sx={{
+                                        height: 22,
+                                        fontSize: '0.7rem',
+                                        fontWeight: 600,
+                                        bgcolor: colors.grayLight,
+                                        color: colors.navy
+                                    }}
+                                />
+
+                                {/* Search Dropdown */}
+                                <Fade in={searchFocused && searchQuery.length > 0}>
+                                    <Paper
+                                        elevation={0}
+                                        sx={{
+                                            position: 'absolute',
+                                            top: 'calc(100% + 8px)',
+                                            left: 0,
+                                            right: 0,
+                                            p: 1,
+                                            borderRadius: 2,
+                                            bgcolor: '#fff',
+                                            border: `1px solid ${colors.navyLighter}`,
+                                            filter: 'drop-shadow(0px 8px 24px rgba(0,0,0,0.12))',
+                                            zIndex: 1300,
+                                            maxHeight: 300,
+                                            overflowY: 'auto'
+                                        }}
+                                    >
+                                        <Typography variant="overline" sx={{ px: 1.5, py: 0.5, color: colors.gray, display: 'block', fontWeight: 700 }}>
+                                            Quick Links
+                                        </Typography>
+                                        {filteredSearch.length > 0 ? (
+                                            filteredSearch.map((item, index) => (
+                                                <MenuItem
+                                                    key={index}
+                                                    onClick={() => handleSearchSelect(item.path)}
+                                                    sx={{
+                                                        borderRadius: 1.5,
+                                                        gap: 1.5,
+                                                        py: 1,
+                                                        color: colors.navy,
+                                                        '&:hover': { bgcolor: colors.grayLighter }
+                                                    }}
+                                                >
+                                                    <Box sx={{ color: colors.teal, display: 'flex' }}>{item.icon}</Box>
+                                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{item.title}</Typography>
+                                                </MenuItem>
+                                            ))
+                                        ) : (
+                                            <MenuItem disabled sx={{ py: 2, justifyContent: 'center' }}>
+                                                <Typography variant="body2" sx={{ color: colors.gray }}>No results found</Typography>
+                                            </MenuItem>
+                                        )}
+                                    </Paper>
+                                </Fade>
+                            </Box>
+                        </ClickAwayListener>
                     </Box>
 
                     {/* Right Side Actions */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Tooltip title="Toggle Theme" arrow>
+                        <Tooltip title="Notifications" arrow>
                             <IconButton
-                                onClick={() => setDarkMode(!darkMode)}
+                                onClick={handleOpenNotifications}
                                 sx={{
                                     color: colors.gray,
                                     '&:hover': { bgcolor: colors.navyLighter }
-                                }}
-                            >
-                                {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
-                            </IconButton>
-                        </Tooltip>
-
-                        <Tooltip title="Notifications" arrow>
-                            <IconButton sx={{
-                                color: colors.gray,
-                                '&:hover': { bgcolor: colors.navyLighter }
-                            }}>
+                                }}>
                                 <Badge
                                     badgeContent={3}
                                     sx={{
@@ -550,6 +659,95 @@ const Layout = ({ children }) => {
                                 </Badge>
                             </IconButton>
                         </Tooltip>
+
+                        {/* Notifications Dropdown */}
+                        <Menu
+                            anchorEl={anchorElNav}
+                            open={notificationsOpen}
+                            onClose={handleCloseNotifications}
+                            PaperProps={{
+                                elevation: 0,
+                                sx: {
+                                    overflow: 'visible',
+                                    filter: 'drop-shadow(0px 4px 20px rgba(0,0,0,0.1))',
+                                    mt: 1.5,
+                                    width: 320,
+                                    bgcolor: '#ffffff',
+                                    '& .MuiAvatar-root': {
+                                        width: 32,
+                                        height: 32,
+                                        ml: -0.5,
+                                        mr: 1,
+                                    },
+                                    '&:before': {
+                                        content: '""',
+                                        display: 'block',
+                                        position: 'absolute',
+                                        top: 0,
+                                        right: 14,
+                                        width: 10,
+                                        height: 10,
+                                        bgcolor: '#ffffff',
+                                        transform: 'translateY(-50%) rotate(45deg)',
+                                        zIndex: 0,
+                                    },
+                                },
+                            }}
+                            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                        >
+                            <ListSubheader sx={{
+                                bgcolor: 'transparent',
+                                color: colors.navy,
+                                fontWeight: 700,
+                                fontSize: '0.9rem',
+                                lineHeight: '40px'
+                            }}>
+                                Notifications
+                            </ListSubheader>
+                            {dummyNotifications.map((notif) => (
+                                <MenuItem key={notif.id} onClick={handleCloseNotifications} sx={{
+                                    py: 1.5,
+                                    px: 2,
+                                    gap: 1.5,
+                                    borderBottom: `1px solid ${colors.navyLighter}`,
+                                    bgcolor: notif.unread ? colors.tealLighter : 'transparent',
+                                    '&:hover': {
+                                        bgcolor: colors.grayLighter
+                                    }
+                                }}>
+                                    <Box sx={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: '50%',
+                                        bgcolor: notif.unread ? colors.teal : 'transparent',
+                                        flexShrink: 0
+                                    }} />
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography variant="body2" sx={{
+                                            color: colors.navy,
+                                            fontWeight: notif.unread ? 600 : 400,
+                                            whiteSpace: 'normal',
+                                            lineHeight: 1.4
+                                        }}>
+                                            {notif.text}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: colors.gray, display: 'block', mt: 0.5 }}>
+                                            {notif.time}
+                                        </Typography>
+                                    </Box>
+                                </MenuItem>
+                            ))}
+                            <Box sx={{ p: 1 }}>
+                                <Button fullWidth size="small" sx={{
+                                    color: colors.teal,
+                                    fontWeight: 600,
+                                    textTransform: 'none'
+                                }}>
+                                    View All Notifications
+                                </Button>
+                            </Box>
+                        </Menu>
 
                         <Divider orientation="vertical" flexItem sx={{ mx: 1.5, height: 24, alignSelf: 'center', borderColor: colors.navyLighter }} />
 
