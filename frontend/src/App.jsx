@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoadingScreen from './components/LoadingScreen';
 import Layout from './components/Layout';
 import LandingPage from './pages/LandingPage';
+import PublicSite from './pages/PublicSite';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/TaskManagement';
 import Portfolio from './pages/PortfolioDashboard';
@@ -26,6 +27,21 @@ const ProtectedRoute = ({ children }) => {
     }
 
     return <Layout>{children}</Layout>;
+};
+
+// Smart root route: authenticated → Dashboard, unauthenticated → PublicSite
+const RootRoute = () => {
+    const { user, isLoading } = useAuth();
+
+    if (isLoading) {
+        return <LoadingScreen />;
+    }
+
+    if (user) {
+        return <Layout><Dashboard /></Layout>;
+    }
+
+    return <PublicSite />;
 };
 
 const PublicRoute = ({ children }) => {
@@ -59,11 +75,7 @@ const AppRoutes = () => {
             {/* Protected Routes */}
             <Route
                 path="/"
-                element={
-                    <ProtectedRoute>
-                        <Dashboard />
-                    </ProtectedRoute>
-                }
+                element={<RootRoute />}
             />
             <Route
                 path="/tasks"

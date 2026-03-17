@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -45,6 +46,7 @@ INSTALLED_APPS = [
     'projects',
     'pm',
     'budget',
+    'researchers',
 ]
 
 MIDDLEWARE = [
@@ -161,11 +163,38 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Email Configuration (for local development)
-# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-EMAIL_BACKEND = 'config.email_backend.NoWrapConsoleEmailBackend'
+# ─── Email Configuration ──────────────────────────────────────────────────────
+# Dev: emails print to terminal (see the banner with the reset link)
+# Prod: set the environment variables below and set EMAIL_USE_SMTP=true
+#
+# Required env vars for production SMTP:
+#   EMAIL_USE_SMTP=true
+#   EMAIL_HOST=smtp.yourprovider.com   (e.g. smtp.gmail.com)
+#   EMAIL_PORT=587
+#   EMAIL_HOST_USER=your@email.com
+#   EMAIL_HOST_PASSWORD=yourpassword
+#   DEFAULT_FROM_EMAIL=CHQI Dashboard <no-reply@chqi.org>
+#   FRONTEND_URL=https://yourdomain.com  (used in reset link)
+
+_use_smtp = os.environ.get('EMAIL_USE_SMTP', 'false').lower() == 'true'
+
+if _use_smtp:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'CHQI Dashboard <no-reply@chqi.org>')
+else:
+    # Development — prints to terminal with a clear banner
+    EMAIL_BACKEND = 'config.email_backend.NoWrapConsoleEmailBackend'
+
+# Frontend URL — used in password reset links.
+# Dev:  http://localhost:5173  (React dev server)
+# Prod: set FRONTEND_URL=https://yourdomain.com as an env var
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 # Logging Configuration
-import os
 
 LOGGING = {
     'version': 1,

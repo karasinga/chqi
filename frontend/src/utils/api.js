@@ -55,6 +55,14 @@ const getHeaders = (contentType = 'application/json') => {
     return headers;
 };
 
+const getMultipartHeaders = () => {
+    // Do NOT set Content-Type — browser must set it with the multipart boundary
+    const headers = {};
+    const csrftoken = manualCsrfToken || getCookie('csrftoken');
+    if (csrftoken) headers['X-CSRFToken'] = csrftoken;
+    return headers;
+};
+
 const api = {
     setToken: (token) => {
         manualCsrfToken = token;
@@ -68,6 +76,13 @@ const api = {
         body: JSON.stringify(data),
         credentials: 'include'
     }).then(handleResponse),
+    // Multipart POST (for FormData / file upload)
+    postMultipart: (endpoint, formData) => fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: getMultipartHeaders(),
+        body: formData,
+        credentials: 'include'
+    }).then(handleResponse),
     put: (endpoint, data) => fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'PUT',
         headers: getHeaders(),
@@ -78,6 +93,13 @@ const api = {
         method: 'PATCH',
         headers: getHeaders(),
         body: JSON.stringify(data),
+        credentials: 'include'
+    }).then(handleResponse),
+    // Multipart PATCH (for FormData / file upload)
+    patchMultipart: (endpoint, formData) => fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'PATCH',
+        headers: getMultipartHeaders(),
+        body: formData,
         credentials: 'include'
     }).then(handleResponse),
     delete: (endpoint) => fetch(`${API_BASE_URL}${endpoint}`, {

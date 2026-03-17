@@ -364,8 +364,36 @@ const LandingPage = () => {
                     p: { xs: 3, sm: 6 },
                     bgcolor: '#FAFBFC',
                     minHeight: { xs: '100dvh', md: '100vh' },
+                    position: 'relative',
                 }}
             >
+                {/* Back to site link */}
+                <Box sx={{
+                    position: 'absolute',
+                    top: { xs: 16, md: 24 },
+                    left: { xs: 16, md: 28 },
+                }}>
+                    <Button
+                        startIcon={<ArrowBackIcon sx={{ fontSize: '1rem !important' }} />}
+                        onClick={() => navigate('/')}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            color: colors.gray,
+                            gap: 0.5,
+                            px: 1.5, py: 0.75,
+                            borderRadius: 2,
+                            '&:hover': {
+                                bgcolor: colors.navyLighter,
+                                color: colors.navy,
+                            },
+                        }}
+                    >
+                        Back to site
+                    </Button>
+                </Box>
+
                 {/* Mobile Logo */}
                 <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 4, textAlign: 'center' }}>
                     <Box sx={{ mb: 2 }}>

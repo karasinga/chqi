@@ -79,6 +79,9 @@ class UserViewSet(viewsets.ModelViewSet):
                     use_https=request.is_secure(),
                     email_template_name='registration/password_reset_email.html',
                     request=request,
+                    extra_email_context={
+                        'frontend_url': settings.FRONTEND_URL,
+                    },
                 )
                 return Response({'detail': 'Password reset email sent.'})
             except Exception as e:
