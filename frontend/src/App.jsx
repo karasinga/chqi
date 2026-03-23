@@ -12,6 +12,7 @@ import Portfolio from './pages/PortfolioDashboard';
 import Settings from './pages/Settings';
 import ProjectDetail from './pages/ProjectDetails';
 import PasswordResetConfirmPage from './pages/PasswordResetConfirmPage';
+import UserGuide from './pages/UserGuide';
 
 const queryClient = new QueryClient();
 
@@ -106,6 +107,15 @@ const AppRoutes = () => {
                 element={
                     <ProtectedRoute>
                         <ProjectDetail />
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/guide"
+                element={
+                    <ProtectedRoute>
+                        <UserGuide />
                     </ProtectedRoute>
                 }
             />

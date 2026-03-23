@@ -849,29 +849,81 @@ const NetworkDiagramContent = forwardRef(({ tasks, isFullScreen, onToggleFullScr
     useEffect(() => {
         if (tasks.length === 0) return;
 
-        let initialNodes = tasks.map(t => ({
+        // Filter out summary tasks. A pure AON network diagram shouldn't show aggregate phases,
+        // only schedulable actions (work packages) and milestones.
+        const networkTasks = tasks.filter(t => t.task_type !== 'summary_task');
+
+        let initialNodes = networkTasks.map(t => ({
             id: String(t.id),
             type: 'cpmNode',
             data: {
-                id: t.id, label: t.name, duration: t.duration,
-                es: t.es, ef: t.ef, ls: t.ls, lf: t.lf,
-                slack: t.slack, is_critical: t.is_critical
+                id: t.id,
+                label: `${t.wbs_code ? t.wbs_code + ' — ' : ''}${t.name}`,
+                duration: t.duration,
+                // Support both new field names and legacy aliases
+                es: t.early_start || t.es || '—',
+                ef: t.early_finish || t.ef || '—',
+                ls: t.late_start || t.ls || '—',
+                lf: t.late_finish || t.lf || '—',
+                slack: t.total_float ?? t.slack ?? '—',
+                is_critical: !!t.is_critical,
+                task_type: t.task_type || 'work_package',
             },
             position: { x: 0, y: 0 }
         }));
 
         const initialEdges = [];
-        const taskIds = new Set(tasks.map(t => t.id));
+        const taskIds = new Set(networkTasks.map(t => t.id));
         const hasPredecessors = new Set();
         const hasSuccessors = new Set();
 
-        tasks.forEach(t => {
-            if (t.dependencies && t.dependencies.length > 0) {
+        networkTasks.forEach(t => {
+            // Prefer typed predecessor_deps; fall back to legacy dependencies array
+            const usedTyped = t.predecessor_deps && t.predecessor_deps.length > 0;
+
+            if (usedTyped) {
+                hasPredecessors.add(t.id);
+                t.predecessor_deps.forEach(dep => {
+                    const depId = dep.predecessor_task;
+                    if (taskIds.has(depId)) {
+                        hasSuccessors.add(depId);
+                        const depTask = networkTasks.find(x => x.id === depId);
+                        const isCriticalEdge = t.is_critical && depTask?.is_critical;
+                        const depType = dep.type || 'FS';
+                        const lag = dep.lag || 0;
+                        const edgeLabel = lag !== 0
+                            ? `${depType} ${lag > 0 ? '+' : ''}${lag}d`
+                            : depType !== 'FS' ? depType : '';
+
+                        initialEdges.push({
+                            id: `e${depId}-${t.id}-${depType}`,
+                            source: String(depId),
+                            target: String(t.id),
+                            type: 'smoothstep',
+                            animated: isCriticalEdge,
+                            label: edgeLabel,
+                            labelStyle: { fill: isCriticalEdge ? '#c62828' : '#64748b', fontWeight: 700, fontSize: 10 },
+                            labelBgStyle: { fill: 'white', fillOpacity: 0.85 },
+                            data: { isCritical: isCriticalEdge },
+                            className: isCriticalEdge ? 'critical-edge' : '',
+                            style: {
+                                stroke: isCriticalEdge ? '#c62828' : '#b1b1b7',
+                                strokeWidth: isCriticalEdge ? 3 : 1.5,
+                            },
+                            markerEnd: {
+                                type: MarkerType.ArrowClosed,
+                                color: isCriticalEdge ? '#c62828' : '#b1b1b7',
+                                width: 20, height: 20,
+                            },
+                        });
+                    }
+                });
+            } else if (t.dependencies && t.dependencies.length > 0) {
                 hasPredecessors.add(t.id);
                 t.dependencies.forEach(depId => {
                     if (taskIds.has(depId)) {
                         hasSuccessors.add(depId);
-                        const depTask = tasks.find(x => x.id === depId);
+                        const depTask = networkTasks.find(x => x.id === depId);
                         const isCriticalEdge = t.is_critical && depTask?.is_critical;
                         initialEdges.push({
                             id: `e${depId}-${t.id}`,
@@ -882,13 +934,13 @@ const NetworkDiagramContent = forwardRef(({ tasks, isFullScreen, onToggleFullScr
                             data: { isCritical: isCriticalEdge },
                             className: isCriticalEdge ? 'critical-edge' : '',
                             style: {
-                                stroke: isCriticalEdge ? '#d32f2f' : '#b1b1b7',
-                                strokeWidth: isCriticalEdge ? 3 : 1.5
+                                stroke: isCriticalEdge ? '#c62828' : '#b1b1b7',
+                                strokeWidth: isCriticalEdge ? 3 : 1.5,
                             },
                             markerEnd: {
                                 type: MarkerType.ArrowClosed,
-                                color: isCriticalEdge ? '#d32f2f' : '#b1b1b7',
-                                width: 20, height: 20
+                                color: isCriticalEdge ? '#c62828' : '#b1b1b7',
+                                width: 20, height: 20,
                             },
                         });
                     }
@@ -929,6 +981,7 @@ const NetworkDiagramContent = forwardRef(({ tasks, isFullScreen, onToggleFullScr
         setEdges(layouted.edges);
         setIsInitialLayoutDone(true);
     }, [tasks, direction, density, setNodes, setEdges]);
+
 
     const nodesInitialized = useNodesInitialized();
 

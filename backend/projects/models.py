@@ -14,6 +14,16 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # ── Scheduling Calendar Fields ──────────────────────────────────
+    # working_days: list of weekday integers (0=Mon … 6=Sun), default Mon-Fri
+    working_days = models.JSONField(default=list, blank=True,
+        help_text="Active weekday numbers: 0=Mon 1=Tue 2=Wed 3=Thu 4=Fri 5=Sat 6=Sun")
+    hours_per_day = models.IntegerField(default=8,
+        help_text="Working hours per day")
+    # holidays: list of ISO-8601 date strings e.g. ["2026-07-04", "2026-12-25"]
+    holidays = models.JSONField(default=list, blank=True,
+        help_text="Non-working dates as ISO-8601 strings")
+
     def __str__(self):
         return self.name
 

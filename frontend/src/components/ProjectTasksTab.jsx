@@ -12,9 +12,10 @@ import {
     FilterList as FilterIcon, CalendarMonth as CalendarIcon,
     Timer as TimerIcon, Flag as PriorityIcon, Person as PersonIcon,
     CheckCircle as CheckCircleIcon, RadioButtonUnchecked as UncheckedIcon,
-    Schedule as ScheduleIcon, Info as StatusIcon
+    Schedule as ScheduleIcon, Info as StatusIcon, AccountTree as WBSIcon,
 } from '@mui/icons-material';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import WBSTable from './WBSTable';
 
 const getPriorityColor = (priority) => {
     switch (priority) {
@@ -62,7 +63,7 @@ const getOverdueInfo = (task) => {
 };
 
 const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onStatusChange, users = [] }) => {
-    const [viewMode, setViewMode] = useState('kanban'); // 'kanban' or 'list'
+    const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'list' | 'wbs'
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterPriority, setFilterPriority] = useState('all');
@@ -523,6 +524,15 @@ const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onSt
                                     <ListIcon fontSize="small" color={viewMode === 'list' ? 'primary' : 'inherit'} />
                                 </IconButton>
                             </Tooltip>
+                            <Tooltip title="WBS Schedule View">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setViewMode('wbs')}
+                                    sx={{ bgcolor: viewMode === 'wbs' ? 'white' : 'transparent', borderRadius: 1.5, boxShadow: viewMode === 'wbs' ? 1 : 0 }}
+                                >
+                                    <WBSIcon fontSize="small" color={viewMode === 'wbs' ? 'primary' : 'inherit'} />
+                                </IconButton>
+                            </Tooltip>
                         </Box>
                     </Grid>
                 </Grid>
@@ -775,6 +785,14 @@ const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onSt
                         </TableBody>
                     </Table>
                 </TableContainer>
+            )}
+            {/* WBS Schedule View */}
+            {viewMode === 'wbs' && (
+                <WBSTable
+                    tasks={filteredTasks}
+                    onEdit={onEditTask}
+                    onDelete={onDeleteTask}
+                />
             )}
         </Box>
     );
