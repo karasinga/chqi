@@ -334,34 +334,115 @@ const ProjectDetails = () => {
 
     const cpmData = rawTasks;
 
-    // ─── Gantt Task Mapping (Brand Colors) ───────────────────────
+    // ─── Gantt Task Mapping (CPM-aware, Brand Colors) ────────────────
     const tasks = useMemo(() => {
         if (!rawTasks.length) return [];
-        return rawTasks.map((t) => {
-            const start = new Date(t.start_date);
-            const end = new Date(start);
-            end.setDate(start.getDate() + (t.duration || 1));
 
-            return {
-                start,
-                end,
-                name: t.name,
-                id: String(t.id),
-                type: 'task',
-                progress: 0,
-                isDisabled: false,
-                dependencies: [],
-                styles: {
-                    progressColor: t.is_critical ? '#dc2626' : tokens.color.accent,
-                    progressSelectedColor: t.is_critical ? '#b91c1c' : tokens.color.accentDark,
-                    backgroundColor: t.is_critical
-                        ? tokens.color.criticalLight
-                        : alpha(tokens.color.accent, 0.45),
-                    backgroundSelectedColor: t.is_critical ? '#ef4444' : tokens.color.accent,
-                },
-            };
+        const idToTask = {};
+        rawTasks.forEach(t => { idToTask[t.id] = t; });
+
+        // 1) Build hierarchy to ensure parent-child rows render together in order
+        const map = {};
+        const roots = [];
+        rawTasks.forEach(t => { map[t.id] = { ...t, _children: [] }; });
+        rawTasks.forEach(t => {
+            if (t.parent_task && map[t.parent_task]) {
+                map[t.parent_task]._children.push(map[t.id]);
+            } else {
+                roots.push(map[t.id]);
+            }
         });
+
+        const sortChildren = (node) => {
+            node._children.sort((a, b) =>
+                (a.sort_order - b.sort_order) ||
+                (a.wbs_code || '').localeCompare(b.wbs_code || '', undefined, { numeric: true, sensitivity: 'base' }) ||
+                a.name.localeCompare(b.name)
+            );
+            node._children.forEach(sortChildren);
+        };
+
+        const rootNodes = roots.sort((a, b) =>
+            (a.sort_order - b.sort_order) ||
+            (a.wbs_code || '').localeCompare(b.wbs_code || '', undefined, { numeric: true, sensitivity: 'base' }) ||
+            a.name.localeCompare(b.name)
+        );
+        rootNodes.forEach(sortChildren);
+
+        const flatTasks = [];
+        const flatten = (node) => {
+            flatTasks.push(node);
+            node._children.forEach(c => flatten(c));
+        };
+        rootNodes.forEach(n => flatten(n));
+
+        return flatTasks
+            .map((t) => {
+                // Use CPM-calculated dates if available; fallback to start_date
+                const startRaw = t.early_start || t.start_date;
+                const endRaw = t.early_finish;
+
+                if (!startRaw) return null;
+
+                const start = new Date(startRaw);
+                let end;
+                if (endRaw) {
+                    end = new Date(endRaw);
+                    // gantt-task-react expects end > start even for milestones
+                    if (end <= start) {
+                        end = new Date(start);
+                        end.setDate(start.getDate() + 1);
+                    }
+                } else {
+                    end = new Date(start);
+                    end.setDate(start.getDate() + Math.max(t.duration || 1, 1));
+                }
+
+                // Determine gantt type: milestone (duration 0), project (summary), or task
+                const isMilestone = t.task_type === 'milestone' || (t.duration || 0) === 0;
+                const isSummary = t.task_type === 'summary_task';
+                const ganttType = isMilestone ? 'milestone' : isSummary ? 'project' : 'task';
+
+                // Build dependency arrows: use typed Dependency ids if available
+                const depsFromTyped = (t.predecessor_deps || [])
+                    .filter(d => idToTask[d.predecessor_task])
+                    .map(d => String(d.predecessor_task));
+
+                const depsFromLegacy = (t.dependencies || [])
+                    .filter(depId => idToTask[depId])
+                    .map(depId => String(depId));
+
+                const dependenciesArr = depsFromTyped.length > 0
+                    ? depsFromTyped
+                    : depsFromLegacy;
+
+                const isCritical = !!t.is_critical;
+                const float = t.total_float ?? t.slack;
+                const floatZero = float === 0 || isCritical;
+
+                return {
+                    start,
+                    end,
+                    name: `${t.wbs_code ? t.wbs_code + ' — ' : ''}${t.name}`,
+                    id: String(t.id),
+                    type: ganttType,
+                    // Link to parent task ID to create the Gantt hierarchy
+                    project: t.parent_task && idToTask[t.parent_task] ? String(t.parent_task) : undefined,
+                    progress: t.status === 'completed' ? 100 : t.status === 'in_progress' ? 50 : 0,
+                    isDisabled: false,
+                    dependencies: [], // Intentionally empty to disable Gantt dependency arrows
+                    hideChildren: false,
+                    styles: {
+                        progressColor: isCritical ? tokens.color.critical : (isSummary ? tokens.color.primary : tokens.color.accent),
+                        progressSelectedColor: isCritical ? tokens.color.critical : (isSummary ? tokens.color.primaryDark : tokens.color.accentDark),
+                        backgroundColor: alpha(isCritical ? tokens.color.critical : (isSummary ? tokens.color.primary : tokens.color.accent), 0.1),
+                        backgroundSelectedColor: alpha(isCritical ? tokens.color.critical : (isSummary ? tokens.color.primary : tokens.color.accent), 0.2),
+                    },
+                };
+            })
+            .filter(Boolean); // remove nulls from tasks with no start date
     }, [rawTasks]);
+
 
     // ─── Mutations ───────────────────────────────────────────────
     const saveTaskMutation = useMutation({

@@ -57,7 +57,15 @@ class ProjectSerializer(serializers.ModelSerializer):
     files = ProjectFileSerializer(many=True, read_only=True)
     folders = FileFolderSerializer(many=True, read_only=True)
     milestones = MilestoneSerializer(many=True, read_only=True)
-    
+
     class Meta:
         model = Project
-        fields = ['id', 'name', 'description', 'start_date', 'end_date', 'status', 'powerbi_embed_url', 'total_budget', 'created_at', 'updated_at', 'files', 'folders', 'milestones']
+        fields = [
+            'id', 'name', 'description', 'start_date', 'end_date', 'status',
+            'powerbi_embed_url', 'total_budget',
+            # CPM calendar fields
+            'working_days', 'hours_per_day', 'holidays',
+            'created_at', 'updated_at',
+            'files', 'folders', 'milestones',
+        ]
+

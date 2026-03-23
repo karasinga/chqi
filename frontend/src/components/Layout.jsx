@@ -15,7 +15,8 @@ import {
     ChevronRight as ChevronRightIcon,
     Logout as LogoutIcon,
     Search as SearchIcon,
-    Notifications as NotificationsIcon
+    Notifications as NotificationsIcon,
+    HelpOutline as HelpOutlineIcon,
 } from '@mui/icons-material';
 import { Link, useLocation } from 'react-router-dom';
 import { keyframes } from '@mui/system';
@@ -56,6 +57,7 @@ const Layout = ({ children }) => {
         { title: 'Tasks Management', path: '/tasks', icon: <AssignmentIcon fontSize="small" /> },
         { title: 'Portfolio Dashboard', path: '/portfolio', icon: <TrendingUpIcon fontSize="small" /> },
         { title: 'User Settings', path: '/settings', icon: <SettingsIcon fontSize="small" /> },
+        { title: 'User Guide / Help', path: '/guide', icon: <HelpOutlineIcon fontSize="small" /> },
     ];
 
     const filteredSearch = searchOptions.filter(opt => opt.title.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -136,6 +138,7 @@ const Layout = ({ children }) => {
         { text: 'Dashboard', icon: <DashboardIcon />, path: '/', badge: null },
         { text: 'Tasks', icon: <AssignmentIcon />, path: '/tasks', badge: 5 },
         { text: 'Portfolio Hub', icon: <TrendingUpIcon />, path: '/portfolio', badge: null },
+        { text: 'Help Center', icon: <HelpOutlineIcon />, path: '/guide', badge: null },
         { text: 'Settings', icon: <SettingsIcon />, path: '/settings', badge: null },
     ];
 

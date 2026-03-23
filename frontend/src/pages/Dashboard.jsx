@@ -931,7 +931,83 @@ const Dashboard = () => {
                                 </Stack>
                             </Paper>
 
-                            {/* Upcoming Deadlines - Now uses memoized data */}
+                            {/* ── CPM Schedule Health panel ─────────── */}
+                            {(() => {
+                                // Compute per-project CPM summary from existing tasks data
+                                const cpmSummary = filteredProjects.map(p => {
+                                    const projectTasks = tasks.filter(t => String(t.project) === String(p.id));
+                                    const criticalTasks = projectTasks.filter(t => t.is_critical);
+                                    // Best estimated project end from CPM early_finish
+                                    const finishDates = projectTasks
+                                        .map(t => t.early_finish || t.ef)
+                                        .filter(Boolean)
+                                        .map(d => new Date(d));
+                                    const projectEnd = finishDates.length > 0
+                                        ? new Date(Math.max(...finishDates))
+                                        : null;
+                                    // Sort critical tasks by early_start for critical chain order
+                                    const chain = criticalTasks
+                                        .slice()
+                                        .sort((a, b) => new Date(a.early_start || a.es || 0) - new Date(b.early_start || b.es || 0));
+                                    return { project: p, criticalCount: criticalTasks.length, projectEnd, chain, totalTasks: projectTasks.length };
+                                }).filter(s => s.criticalCount > 0 || s.totalTasks > 0);
+
+                                if (cpmSummary.length === 0) return null;
+
+                                return (
+                                    <Paper sx={{ p: 3, borderRadius: 3, border: `1px solid #fecaca`, bgcolor: '#fff' }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#c62828' }} />
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.navy }}>
+                                                CPM Schedule Health
+                                            </Typography>
+                                        </Box>
+                                        <Stack spacing={2}>
+                                            {cpmSummary.map(({ project: p, criticalCount, projectEnd, chain, totalTasks }) => (
+                                                <Box
+                                                    key={p.id}
+                                                    sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${colors.navyLighter}`, cursor: 'pointer', '&:hover': { bgcolor: '#fafbfc', borderColor: '#c62828' } }}
+                                                    onClick={() => navigate(`/projects/${p.id}`)}
+                                                >
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                                        <Typography variant="caption" sx={{ fontWeight: 800, color: colors.navy, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                                            {p.name}
+                                                        </Typography>
+                                                        {criticalCount > 0 && (
+                                                            <Chip
+                                                                label={`${criticalCount} critical`}
+                                                                size="small"
+                                                                sx={{ height: 18, fontSize: '0.6rem', fontWeight: 800, bgcolor: '#fef2f2', color: '#c62828', border: '1px solid #fecaca', ml: 1 }}
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                    {projectEnd && (
+                                                        <Typography variant="caption" sx={{ color: colors.gray, display: 'block', mb: 0.5 }}>
+                                                            📅 Calc. End: <strong>{projectEnd.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</strong>
+                                                        </Typography>
+                                                    )}
+                                                    {chain.length > 0 && (
+                                                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                                                            {chain.slice(0, 3).map((t, i) => (
+                                                                <Typography key={t.id} variant="caption" sx={{ fontSize: '0.62rem', color: '#c62828', fontWeight: 700 }}>
+                                                                    {i > 0 ? '→ ' : '🔴 '}{t.name}
+                                                                </Typography>
+                                                            ))}
+                                                            {chain.length > 3 && (
+                                                                <Typography variant="caption" sx={{ fontSize: '0.62rem', color: colors.gray }}>
+                                                                    +{chain.length - 3} more
+                                                                </Typography>
+                                                            )}
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            ))}
+                                        </Stack>
+                                    </Paper>
+                                );
+                            })()}
+
+
                             <Paper sx={{ p: 3, borderRadius: 3, border: `1px solid ${colors.navyLighter}` }}>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: colors.navy }}>
                                     Upcoming Deadlines
