@@ -41,11 +41,13 @@ const getNormalizedStatus = (status) => {
 
 const getOverdueInfo = (task) => {
     if (task.status === 'completed' || task.status === 'done') return null;
-    if (!task.start_date) return null;
 
-    const endDate = new Date(task.start_date);
-    const duration = parseInt(task.duration || 0, 10);
-    endDate.setDate(endDate.getDate() + duration);
+    // Use early_finish from the CPM engine — it already accounts for weekends + holidays.
+    // Fall back to start_date only if early_finish hasn't been computed yet.
+    const finishDateStr = task.early_finish || task.start_date;
+    if (!finishDateStr) return null;
+
+    const endDate = new Date(finishDateStr);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     endDate.setHours(0, 0, 0, 0);
@@ -62,7 +64,7 @@ const getOverdueInfo = (task) => {
     return null;
 };
 
-const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onStatusChange, users = [] }) => {
+const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onStatusChange, users = [], onRenumberWbs }) => {
     const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'list' | 'wbs'
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
@@ -84,10 +86,10 @@ const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onSt
 
             const isOverdue = (() => {
                 if (normStatus === 'completed') return false;
-                if (!task.start_date) return false; // Ensure start_date exists for calculation
-                const endDate = new Date(task.start_date);
-                endDate.setDate(endDate.getDate() + (task.duration || 0));
-                return endDate < new Date();
+                // Use early_finish (CPM-computed, calendar-aware); fall back to start_date
+                const finishDateStr = task.early_finish || task.start_date;
+                if (!finishDateStr) return false;
+                return new Date(finishDateStr) < new Date();
             })();
 
             const matchesOverdue = !filterOverdue || isOverdue;
@@ -136,9 +138,11 @@ const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onSt
 
         const overdue = tasks.filter(t => {
             const normalized = getNormalizedStatus(t.status);
-            const endDate = new Date(t.start_date);
-            endDate.setDate(endDate.getDate() + t.duration);
-            return endDate < new Date() && normalized !== 'completed';
+            if (normalized === 'completed') return false;
+            // Use early_finish (CPM-computed, calendar-aware); fall back to start_date
+            const finishDateStr = t.early_finish || t.start_date;
+            if (!finishDateStr) return false;
+            return new Date(finishDateStr) < new Date();
         }).length;
         const completionRate = total > 0 ? Math.round((byStatus.completed / total) * 100) : 0;
 
@@ -429,7 +433,7 @@ const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onSt
             {/* Controls */}
             <Paper sx={{ p: 2, mb: 3, borderRadius: 3 }}>
                 <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} md={3}>
+                    <Grid item xs={12} md={2.5}>
                         <TextField
                             fullWidth
                             size="small"
@@ -446,7 +450,7 @@ const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onSt
                             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                         />
                     </Grid>
-                    <Grid item xs={6} md={2}>
+                    <Grid item xs={6} md={1.5}>
                         <FormControl fullWidth size="small">
                             <InputLabel>Status</InputLabel>
                             <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} label="Status">
@@ -458,7 +462,7 @@ const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onSt
                             </Select>
                         </FormControl>
                     </Grid>
-                    <Grid item xs={6} md={2}>
+                    <Grid item xs={6} md={1.5}>
                         <FormControl fullWidth size="small">
                             <InputLabel>Priority</InputLabel>
                             <Select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} label="Priority">
@@ -534,6 +538,23 @@ const ProjectTasksTab = ({ tasks = [], onAddTask, onEditTask, onDeleteTask, onSt
                                 </IconButton>
                             </Tooltip>
                         </Box>
+                    </Grid>
+                    <Grid item xs={12} md={1.5}>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            fullWidth
+                            onClick={onRenumberWbs}
+                            sx={{
+                                fontWeight: 800, textTransform: 'none', borderRadius: 2,
+                                borderColor: 'divider', color: 'text.secondary',
+                                height: 36,
+                                '&:hover': { borderColor: 'primary.main', color: 'primary.main', bgcolor: 'primary.50' }
+                            }}
+                            startIcon={<WBSIcon fontSize="small" />}
+                        >
+                            Renumber WBS
+                        </Button>
                     </Grid>
                 </Grid>
             </Paper>

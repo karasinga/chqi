@@ -16,6 +16,7 @@ Checks performed:
 
 from collections import defaultdict, deque
 import logging
+from .workingCalendar import subtract_working_days
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,10 @@ def validate_schedule(project_id):
             if current is None or p.early_finish > current:
                 pred_ef_map[s_id] = p.early_finish
 
+    # Grab working calendar for working-day-aware constraint checks
+    wd = getattr(project, 'working_days', None) or [0, 1, 2, 3, 4]
+    hol = getattr(project, 'holidays', None) or []
+
     for t in tasks:
         ctype = t.constraint_type or 'as_soon_as_possible'
         cdate = t.constraint_date
@@ -134,9 +139,8 @@ def validate_schedule(project_id):
                 f"predecessor logic. The task cannot start by {cdate}."
             )
         elif ctype == 'must_finish_on':
-            from datetime import timedelta
-            # Very rough check: if predecessor EF > must_finish_on - duration
-            approx_latest_start = cdate - timedelta(days=t.duration or 0)
+            # Working-day-aware check: latest valid start = must_finish_on - duration (working days)
+            approx_latest_start = subtract_working_days(cdate, t.duration or 0, wd, hol)
             if pred_max_ef > approx_latest_start:
                 warnings.append(
                     f"Constraint on '{t.name}' (Must Finish On {cdate}) may be impossible "

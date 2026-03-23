@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
@@ -21,6 +21,8 @@ import {
     Schedule as ScheduleIcon,
     Warning as WarningIcon,
     CheckCircle as CriticalIcon,
+    Autorenew as AutorenewIcon,
+    Lock as LockIcon,
 } from '@mui/icons-material';
 import api from '../utils/api';
 
@@ -151,6 +153,56 @@ const DependencyRow = ({ dep, index, allTasks, currentTaskId, onChange, onRemove
     </Box>
 );
 
+// ─── WBS auto-generation ────────────────────────────────────────────
+/**
+ * Compute the next available WBS code for a task being created/moved.
+ *
+ * @param {string|number|null} parentTaskId  - The chosen parent task id (null = top-level)
+ * @param {string|number}      projectId     - Current project id
+ * @param {Array}              allTasks      - Full task list (any project; filtered inside)
+ * @param {number|null}        excludeTaskId - Task being edited (excluded from sibling count)
+ * @returns {string}  e.g. "1", "2.3", "1.2.1"
+ */
+function suggestWbsCode(parentTaskId, projectId, allTasks, excludeTaskId = null) {
+    const pId = Number(projectId);
+    const projectTasks = allTasks.filter(
+        t => (Number(t.project) === pId || t.project === projectId) &&
+            t.id !== excludeTaskId
+    );
+
+    if (!parentTaskId) {
+        // ── Top-level task: WBS is a plain integer ("1", "2", "3" …) ──
+        const maxNum = projectTasks
+            .filter(t => !t.parent_task)
+            .reduce((max, t) => {
+                const top = parseInt((t.wbs_code || '').split('.')[0], 10);
+                return isNaN(top) ? max : Math.max(max, top);
+            }, 0);
+        return String(maxNum + 1);
+    }
+
+    // ── Child task: find parent WBS then count siblings ───────────────
+    const parent = projectTasks.find(t => t.id === Number(parentTaskId));
+    const parentWbs = parent?.wbs_code || '';
+
+    const siblings = projectTasks.filter(
+        t => t.parent_task === Number(parentTaskId)
+    );
+
+    const maxIdx = siblings.reduce((max, t) => {
+        const code = t.wbs_code || '';
+        // Match codes that extend the parent prefix, e.g. "1.2" → "1.2.X"
+        const prefix = parentWbs ? parentWbs + '.' : '';
+        const relevant = prefix ? code.startsWith(prefix) : true;
+        if (!relevant) return max;
+        const rest = prefix ? code.slice(prefix.length) : code;
+        const num = parseInt(rest.split('.')[0], 10);
+        return isNaN(num) ? max : Math.max(max, num);
+    }, 0);
+
+    return parentWbs ? `${parentWbs}.${maxIdx + 1}` : String(maxIdx + 1);
+}
+
 // ─── Build flatten tree for dropdowns ──────────────────────────────
 function buildTreeFlat(tasks) {
     const map = {};
@@ -216,6 +268,8 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
     const [formData, setFormData] = useState(blankForm);
     const [newComment, setNewComment] = useState('');
     const [validation, setValidation] = useState(null); // {errors, warnings}
+    // Track whether the user has manually typed a WBS code (overrides auto-suggestion)
+    const [wbsUserEdited, setWbsUserEdited] = useState(false);
 
     // ── Data queries ────────────────────────────────────────────
     const { data: users = [] } = useQuery({
@@ -276,8 +330,25 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
         } else {
             setFormData({ ...blankForm, project: defaultProjectId || '' });
             setValidation(null);
+            setWbsUserEdited(false); // fresh form → allow auto-suggestion
         }
     }, [task, open, defaultProjectId]);
+
+    // ── Auto-suggest WBS when parent_task changes ────────────────────
+    useEffect(() => {
+        // Skip for edit mode (task already has a WBS), skip if user typed their own
+        if (task || wbsUserEdited) return;
+        if (!formData.project) return;
+
+        const suggested = suggestWbsCode(
+            formData.parent_task || null,
+            formData.project,
+            allTasks,
+            task?.id ?? null
+        );
+        setFormData(prev => ({ ...prev, wbs_code: suggested }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formData.parent_task, formData.project]);
 
     // ── Handlers ────────────────────────────────────────────────
     const handleChange = (e) => {
@@ -288,9 +359,23 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
             if (name === 'task_type' && value === 'milestone') updates.duration = 0;
             // Summary tasks don't need a user-set duration
             if (name === 'project') updates.task_dependencies = [];
+            // When parent_task changes, reset the user-edited flag so auto-suggestion fires
+            if (name === 'parent_task') setWbsUserEdited(false);
             return { ...prev, ...updates };
         });
     };
+
+    // Re-run WBS suggestion on demand (refresh button)
+    const handleRefreshWbs = useCallback(() => {
+        setWbsUserEdited(false);
+        const suggested = suggestWbsCode(
+            formData.parent_task || null,
+            formData.project,
+            allTasks,
+            task?.id ?? null
+        );
+        setFormData(prev => ({ ...prev, wbs_code: suggested }));
+    }, [formData.parent_task, formData.project, allTasks, task]);
 
     const handleDepChange = (idx, field, val) => {
         setFormData(prev => {
@@ -492,9 +577,36 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
                                 fullWidth
                                 placeholder="e.g. 1.2.3"
                                 value={formData.wbs_code}
-                                onChange={handleChange}
+                                onChange={(e) => {
+                                    setWbsUserEdited(true); // user is taking manual control
+                                    handleChange(e);
+                                }}
                                 disabled={viewMode}
                                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                                helperText={
+                                    !viewMode && wbsUserEdited
+                                        ? 'Custom code — click ↺ to auto-suggest'
+                                        : !viewMode
+                                            ? 'Auto-generated'
+                                            : undefined
+                                }
+                                InputProps={{
+                                    endAdornment: !viewMode && (
+                                        <InputAdornment position="end">
+                                            <Tooltip title={wbsUserEdited ? 'Reset to auto-suggestion' : 'Auto-generated from parent'}>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={handleRefreshWbs}
+                                                    sx={{ color: wbsUserEdited ? 'warning.main' : 'success.main', p: 0.5 }}
+                                                >
+                                                    {wbsUserEdited
+                                                        ? <LockIcon sx={{ fontSize: 14 }} />
+                                                        : <AutorenewIcon sx={{ fontSize: 14 }} />}
+                                                </IconButton>
+                                            </Tooltip>
+                                        </InputAdornment>
+                                    )
+                                }}
                             />
                         </Grid>
                     </Grid>
