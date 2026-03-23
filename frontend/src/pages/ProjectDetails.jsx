@@ -466,8 +466,19 @@ const ProjectDetails = () => {
             setDeleteModalOpen(false);
             setTaskToDelete(null);
             setRefreshTrigger((p) => p + 1);
+            // Auto-renumber WBS after deletion to close any gaps
+            renumberWbsMutation.mutate();
         },
         onError: (err) => console.error('Error deleting task:', err),
+    });
+
+    const renumberWbsMutation = useMutation({
+        mutationFn: () => api.post(`/pm/tasks/renumber_wbs/?project_id=${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['projectTasks', id] });
+            setRefreshTrigger((p) => p + 1);
+        },
+        onError: (err) => console.error('WBS renumber failed:', err),
     });
 
     const updateTaskStatusMutation = useMutation({
@@ -985,6 +996,7 @@ const ProjectDetails = () => {
                                 setOpenTaskForm(true);
                             }}
                             onDeleteTask={handleTaskDelete}
+                            onRenumberWbs={() => renumberWbsMutation.mutate()}
                             onStatusChange={(taskId, status) =>
                                 updateTaskStatusMutation.mutate({ taskId, status })
                             }

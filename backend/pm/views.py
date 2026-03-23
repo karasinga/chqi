@@ -213,6 +213,75 @@ class TaskViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
         result = validate_schedule(project_id)
         return Response(result)
 
+    @action(detail=False, methods=['post'])
+    def renumber_wbs(self, request):
+        """
+        Reassign clean sequential WBS codes to all tasks in a project.
+
+        Walk order: tree DFS in (sort_order, wbs_code) sequence.
+        Root tasks get  "1", "2", "3" …
+        Children get    "1.1", "1.2", "1.3" …
+        Grandchildren   "1.1.1", "1.1.2" …
+
+        Returns: {"updated": [{"id": .., "wbs_code": ..}, …]}
+        """
+        from collections import defaultdict
+
+        project_id = request.query_params.get('project_id')
+        if not project_id:
+            return Response({"error": "project_id is required"}, status=400)
+
+        tasks = list(Task.objects.filter(project_id=project_id))
+        if not tasks:
+            return Response({"updated": []})
+
+        # Build id→task map and children adjacency
+        task_map = {t.id: t for t in tasks}
+        children = defaultdict(list)
+        roots = []
+
+        for t in tasks:
+            if t.parent_task_id and t.parent_task_id in task_map:
+                children[t.parent_task_id].append(t)
+            else:
+                roots.append(t)
+
+        def sort_key(t):
+            """Sort by sort_order first, then numeric wbs segments, then name."""
+            parts = []
+            for seg in (t.wbs_code or '').split('.'):
+                try:
+                    parts.append(int(seg))
+                except ValueError:
+                    parts.append(0)
+            return (t.sort_order or 0, parts or [0], t.name)
+
+        roots.sort(key=sort_key)
+        for child_list in children.values():
+            child_list.sort(key=sort_key)
+
+        # DFS: assign new codes
+        updates = []
+
+        def assign(node, prefix):
+            new_code = prefix
+            if node.wbs_code != new_code:
+                node.wbs_code = new_code
+                updates.append(node)
+            for i, child in enumerate(children.get(node.id, []), start=1):
+                assign(child, f"{new_code}.{i}")
+
+        for i, root in enumerate(roots, start=1):
+            assign(root, str(i))
+
+        if updates:
+            Task.objects.bulk_update(updates, ['wbs_code'])
+
+        return Response({
+            "updated": [{"id": t.id, "wbs_code": t.wbs_code} for t in updates],
+            "total_renumbered": len(updates),
+        })
+
 
 class DependencyViewSet(viewsets.ModelViewSet):
     """

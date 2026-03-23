@@ -112,6 +112,12 @@ class TaskSerializer(serializers.ModelSerializer):
         if legacy_deps:
             task.dependencies.set(legacy_deps)
         self._save_typed_deps(task, task_deps_data)
+
+        # Auto-generate WBS code if the user didn't supply one
+        if not task.wbs_code:
+            task.wbs_code = self._auto_wbs_code(task)
+            task.save(update_fields=['wbs_code'])
+
         return task
 
     def update(self, instance, validated_data):
@@ -153,3 +159,48 @@ class TaskSerializer(serializers.ModelSerializer):
             ))
         if create_list:
             Dependency.objects.bulk_create(create_list, ignore_conflicts=True)
+
+    def _auto_wbs_code(self, task):
+        """
+        Server-side WBS code generation — mirrors the frontend suggestWbsCode() logic.
+
+        Rules:
+          - Top-level task (no parent): WBS = max existing top-level integer + 1
+          - Child task: WBS = parentWbs + '.' + (max sibling sub-index + 1)
+
+        Excludes the task itself from the sibling scan (already saved but code is empty).
+        """
+        from pm.models import Task as TaskModel  # local import to avoid circular
+
+        project_tasks = TaskModel.objects.filter(
+            project_id=task.project_id
+        ).exclude(pk=task.pk)
+
+        if not task.parent_task_id:
+            # ── Top-level ──
+            max_num = 0
+            for t in project_tasks.filter(parent_task__isnull=True):
+                code = (t.wbs_code or '').split('.')[0]
+                try:
+                    max_num = max(max_num, int(code))
+                except ValueError:
+                    pass
+            return str(max_num + 1)
+
+        # ── Child task ──
+        parent = project_tasks.filter(pk=task.parent_task_id).first()
+        parent_wbs = (parent.wbs_code or '') if parent else ''
+        prefix = parent_wbs + '.' if parent_wbs else ''
+
+        max_idx = 0
+        for t in project_tasks.filter(parent_task_id=task.parent_task_id):
+            code = t.wbs_code or ''
+            if prefix and not code.startswith(prefix):
+                continue
+            rest = code[len(prefix):] if prefix else code
+            try:
+                max_idx = max(max_idx, int(rest.split('.')[0]))
+            except ValueError:
+                pass
+
+        return f'{parent_wbs}.{max_idx + 1}' if parent_wbs else str(max_idx + 1)
