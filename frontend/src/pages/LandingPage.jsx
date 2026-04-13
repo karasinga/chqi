@@ -19,11 +19,11 @@ import {
     LockOutlined as LockIcon,
     PersonOutline as PersonIcon,
     EmailOutlined as EmailIcon,
-    ArrowBack as ArrowBackIcon,
     Security as SecurityIcon,
     Speed as SpeedIcon,
     Groups as GroupsIcon,
-    CheckCircleOutline as CheckIcon
+    CheckCircleOutline as CheckIcon,
+    ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import { keyframes } from '@mui/system';
 import { useAuth } from '../context/AuthContext';
@@ -367,27 +367,19 @@ const LandingPage = () => {
                     position: 'relative',
                 }}
             >
-                {/* Back to site link */}
-                <Box sx={{
-                    position: 'absolute',
-                    top: { xs: 16, md: 24 },
-                    left: { xs: 16, md: 28 },
-                }}>
+                {/* Back to site button */}
+                <Box sx={{ position: 'absolute', top: 24, left: 24 }}>
                     <Button
-                        startIcon={<ArrowBackIcon sx={{ fontSize: '1rem !important' }} />}
+                        startIcon={<ArrowBackIcon />}
                         onClick={() => navigate('/')}
                         sx={{
+                            color: colors.gray,
                             textTransform: 'none',
                             fontWeight: 600,
-                            fontSize: '0.85rem',
-                            color: colors.gray,
-                            gap: 0.5,
-                            px: 1.5, py: 0.75,
-                            borderRadius: 2,
                             '&:hover': {
-                                bgcolor: colors.navyLighter,
                                 color: colors.navy,
-                            },
+                                bgcolor: 'transparent',
+                            }
                         }}
                     >
                         Back to site

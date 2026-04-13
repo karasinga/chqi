@@ -24,7 +24,7 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
 
     @method_decorator(ensure_csrf_cookie)
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[])
     def online_count(self, request):
         fifteen_minutes_ago = timezone.now() - timedelta(minutes=15)
         count = User.objects.filter(last_active__gte=fifteen_minutes_ago).count()
