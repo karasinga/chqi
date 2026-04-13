@@ -31,7 +31,8 @@ window.onerror = (message, source, lineno, colno, error) => {
         headers['X-CSRFToken'] = csrftoken;
     }
 
-    fetch('http://localhost:8000/api/pm/logs/', {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    fetch(`${API_BASE_URL}/api/pm/logs/`, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
@@ -52,7 +53,8 @@ window.onunhandledrejection = (event) => {
         headers['X-CSRFToken'] = csrftoken;
     }
 
-    fetch('http://localhost:8000/api/pm/logs/', {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    fetch(`${API_BASE_URL}/api/pm/logs/`, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({

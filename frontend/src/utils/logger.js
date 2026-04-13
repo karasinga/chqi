@@ -14,7 +14,7 @@ const getCookie = (name) => {
     return cookieValue;
 };
 
-const LOG_API_URL = 'http://localhost:8000/api/pm/logs/';
+const LOG_API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000') + '/api/pm/logs/';
 
 const logger = {
     log: (level, message, stack = '', componentStack = '') => {

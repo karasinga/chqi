@@ -50,7 +50,8 @@ class GlobalErrorBoundary extends React.Component {
                 headers['X-CSRFToken'] = csrftoken;
             }
 
-            await fetch('http://localhost:8000/api/pm/logs/', {
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            await fetch(`${API_BASE_URL}/api/pm/logs/`, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(errorData),

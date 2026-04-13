@@ -21,10 +21,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-0kzz5qyd8-g=2&$%r#lvpzjl=$ftq^qz06etd3_!=6^+%p7jc4'
+# In production, set DJANGO_SECRET_KEY as an environment variable.
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-0kzz5qyd8-g=2&$%r#lvpzjl=$ftq^qz06etd3_!=6^+%p7jc4'  # dev fallback only
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# In production, set DJANGO_DEBUG=False as an environment variable.
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() not in ('false', '0', 'no')
 
 ALLOWED_HOSTS = []
 
@@ -61,22 +66,33 @@ MIDDLEWARE = [
     'users.middleware.UserPresenceMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:5173",
-    "http://localhost:5174",
-]
+# In production, set CORS_ALLOWED_ORIGINS_LIST=https://yourdomain.com,https://www.yourdomain.com
+_cors_env = os.environ.get('CORS_ALLOWED_ORIGINS_LIST', '')
+CORS_ALLOWED_ORIGINS = (
+    [u.strip() for u in _cors_env.split(',') if u.strip()]
+    if _cors_env
+    else [
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ]
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-]
+_csrf_env2 = os.environ.get('CSRF_TRUSTED_ORIGINS_LIST', '')
+CSRF_TRUSTED_ORIGINS = (
+    [u.strip() for u in _csrf_env2.split(',') if u.strip()]
+    if _csrf_env2
+    else [
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ]
+)
 
 # CSRF Settings for Frontend Compatibility
-CSRF_COOKIE_HTTPONLY = False  # Allow JS to read the cookie
-CSRF_USE_SESSIONS = False      # Ensure cookie-based CSRF is used
+CSRF_COOKIE_HTTPONLY = False   # Allow JS to read the token (required for SPA CSRF pattern)
+CSRF_USE_SESSIONS = False       # Ensure cookie-based CSRF is used
+SESSION_COOKIE_HTTPONLY = True  # Prevent JS from reading the session cookie (XSS protection)
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 
@@ -85,7 +101,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Temporarily allow all for debugging
+        'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
