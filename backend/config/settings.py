@@ -12,6 +12,11 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+import dotenv
+import dj_database_url
+
+# Load environment variables from .env file
+dotenv.load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -31,7 +36,8 @@ SECRET_KEY = os.environ.get(
 # In production, set DJANGO_DEBUG=False as an environment variable.
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() not in ('false', '0', 'no')
 
-ALLOWED_HOSTS = []
+_allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()] if _allowed_hosts_env else ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -55,8 +61,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -130,12 +137,35 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database Configuration
+# Uses DATABASE_URL environment variable if present.
+# Otherwise, constructs it from DB_* environment variables.
+# Falls back to local SQLite for easy development.
+
+if os.environ.get('DATABASE_URL'):
+    DATABASES = {
+        'default': dj_database_url.config(conn_max_age=600)
     }
-}
+elif os.environ.get('DB_NAME'):
+    # Build URL from components if provided
+    _db_user = os.environ.get('DB_USER', 'postgres')
+    _db_pass = os.environ.get('DB_PASSWORD', '')
+    _db_host = os.environ.get('DB_HOST', 'localhost')
+    _db_port = os.environ.get('DB_PORT', '5432')
+    _db_name = os.environ.get('DB_NAME', 'postgres')
+    _db_ssl = os.environ.get('DB_SSLMODE', 'prefer')
+    
+    _db_url = f"postgres://{_db_user}:{_db_pass}@{_db_host}:{_db_port}/{_db_name}?sslmode={_db_ssl}"
+    DATABASES = {
+        'default': dj_database_url.parse(_db_url)
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -173,6 +203,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise storage for compressed/cached static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -273,6 +307,25 @@ LOGGING = {
         },
     },
 }
+
+# ─── Production Security Settings ──────────────────────────────────────────────
+if not DEBUG:
+    # Use HTTPS redirects and secure cookies
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() == 'true'
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    
+    # HTTP Strict Transport Security (HSTS)
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Proxy security
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    
+    # XSS Protection
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # Ensure logs directory exists
 LOGS_DIR = BASE_DIR / 'logs'
