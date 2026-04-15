@@ -1,5 +1,5 @@
-[providers]
-node = {}
+# Explicitly state the provider as a sequence (array)
+providers = ["node"]
 
 [phases.install]
 # This deletes the conflicting lockfile and forces a fresh install for Linux
