@@ -85,6 +85,7 @@ CORS_ALLOWED_ORIGINS = (
 )
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Caveman Lite: Allow all in dev
 
 _csrf_env2 = os.environ.get('CSRF_TRUSTED_ORIGINS_LIST', '')
 CSRF_TRUSTED_ORIGINS = (
@@ -93,6 +94,8 @@ CSRF_TRUSTED_ORIGINS = (
     else [
         "http://localhost:5173",
         "http://localhost:5174",
+        "https://*.sslip.io",
+        "http://*.sslip.io",
     ]
 )
 
@@ -147,17 +150,19 @@ if os.environ.get('DATABASE_URL'):
         'default': dj_database_url.config(conn_max_age=600)
     }
 elif os.environ.get('DB_NAME'):
-    # Build URL from components if provided
-    _db_user = os.environ.get('DB_USER', 'postgres')
-    _db_pass = os.environ.get('DB_PASSWORD', '')
-    _db_host = os.environ.get('DB_HOST', 'localhost')
-    _db_port = os.environ.get('DB_PORT', '5432')
-    _db_name = os.environ.get('DB_NAME', 'postgres')
-    _db_ssl = os.environ.get('DB_SSLMODE', 'prefer')
-    
-    _db_url = f"postgres://{_db_user}:{_db_pass}@{_db_host}:{_db_port}/{_db_name}?sslmode={_db_ssl}"
+    # Direct dictionary configuration is more robust than URL strings for some drivers
     DATABASES = {
-        'default': dj_database_url.parse(_db_url)
+        'default': {
+            'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
+            'NAME': os.environ.get('DB_NAME', 'postgres'),
+            'USER': os.environ.get('DB_USER', 'postgres'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+            'OPTIONS': {
+                'sslmode': os.environ.get('DB_SSLMODE', 'prefer'),
+            }
+        }
     }
 else:
     DATABASES = {

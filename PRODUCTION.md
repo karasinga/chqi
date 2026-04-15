@@ -41,22 +41,13 @@ Open `backend/config/settings.py` and apply the following before deploying:
 
 ### 2a. Swap SQLite → PostgreSQL
 
-Replace the `DATABASES` block:
+The easiest way is to set a single `DATABASE_URL` environment variable.
 
-```python
-import os
-
-DATABASES = {
-    'default': {
-        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.environ.get('DB_NAME', BASE_DIR / 'db.sqlite3'),
-        'USER': os.environ.get('DB_USER', ''),
-        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-        'HOST': os.environ.get('DB_HOST', ''),
-        'PORT': os.environ.get('DB_PORT', ''),
-    }
-}
+```env
+DATABASE_URL=postgres://user:password@hostname:5432/dbname?sslmode=require
 ```
+
+Your `settings.py` is already configured to prioritize `DATABASE_URL` if it exists. If you prefer discrete variables, you can set `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, and `DB_PORT` instead.
 
 Install the driver:
 ```bash
