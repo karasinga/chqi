@@ -1,0 +1,6 @@
+[providers]
+node = {}
+
+[phases.install]
+# This deletes the conflicting lockfile and forces a fresh install for Linux
+cmds = ["rm -f package-lock.json", "npm install"]
