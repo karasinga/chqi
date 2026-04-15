@@ -37,7 +37,7 @@ SECRET_KEY = os.environ.get(
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() not in ('false', '0', 'no')
 
 _allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
-ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()] if _allowed_hosts_env else ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()] if _allowed_hosts_env else ['localhost', '127.0.0.1', '.sslip.io']
 
 
 # Application definition
