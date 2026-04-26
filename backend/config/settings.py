@@ -103,8 +103,14 @@ CSRF_TRUSTED_ORIGINS = (
 CSRF_COOKIE_HTTPONLY = False   # Allow JS to read the token (required for SPA CSRF pattern)
 CSRF_USE_SESSIONS = False       # Ensure cookie-based CSRF is used
 SESSION_COOKIE_HTTPONLY = True  # Prevent JS from reading the session cookie (XSS protection)
-SESSION_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Share cookies across all chqi.org subdomains
+SESSION_COOKIE_DOMAIN = '.chqi.org'
+CSRF_COOKIE_DOMAIN = '.chqi.org'
+
+# Cross-domain cookie settings
+SESSION_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SAMESITE = 'None'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
