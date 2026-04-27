@@ -248,7 +248,7 @@ const WBSTable = ({ tasks = [], onEdit, onDelete }) => {
         };
 
         Object.entries(collapsed).forEach(([id, isCollapsed]) => {
-            if (isCollapsed) markHidden(Number(id));
+            if (isCollapsed) markHidden(id);
         });
 
         return flatTree.filter(r => !hiddenIds.has(r.id));

@@ -583,7 +583,7 @@ const ProjectDetails = () => {
     };
 
     const handleTaskSave = (taskData) => {
-        saveTaskMutation.mutate({ ...taskData, project: Number(id) });
+        saveTaskMutation.mutate({ ...taskData, project: id });
     };
 
     const handleTaskDelete = (task) => {

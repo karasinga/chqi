@@ -112,7 +112,7 @@ const DependencyRow = ({ dep, index, allTasks, currentTaskId, onChange, onRemove
             <Select
                 value={dep.predecessor_id || ''}
                 label="Predecessor"
-                onChange={(e) => onChange(index, 'predecessor_id', Number(e.target.value))}
+                onChange={(e) => onChange(index, 'predecessor_id', e.target.value)}
             >
                 {allTasks
                     .filter(t => t.id !== currentTaskId)
@@ -164,9 +164,9 @@ const DependencyRow = ({ dep, index, allTasks, currentTaskId, onChange, onRemove
  * @returns {string}  e.g. "1", "2.3", "1.2.1"
  */
 function suggestWbsCode(parentTaskId, projectId, allTasks, excludeTaskId = null) {
-    const pId = Number(projectId);
+    const pId = projectId;
     const projectTasks = allTasks.filter(
-        t => (Number(t.project) === pId || t.project === projectId) &&
+        t => (t.project === pId || t.project === projectId) &&
             t.id !== excludeTaskId
     );
 
@@ -182,11 +182,11 @@ function suggestWbsCode(parentTaskId, projectId, allTasks, excludeTaskId = null)
     }
 
     // ── Child task: find parent WBS then count siblings ───────────────
-    const parent = projectTasks.find(t => t.id === Number(parentTaskId));
+    const parent = projectTasks.find(t => t.id === parentTaskId);
     const parentWbs = parent?.wbs_code || '';
 
     const siblings = projectTasks.filter(
-        t => t.parent_task === Number(parentTaskId)
+        t => t.parent_task === parentTaskId
     );
 
     const maxIdx = siblings.reduce((max, t) => {
@@ -403,10 +403,10 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
 
         const cleanData = {
             name: formData.name,
-            project: Number(formData.project),
+            project: formData.project,
             task_type: formData.task_type,
             wbs_code: formData.wbs_code || '',
-            parent_task: formData.parent_task ? Number(formData.parent_task) : null,
+            parent_task: formData.parent_task || null,
             sort_order: Number(formData.sort_order || 0),
             duration: formData.task_type === 'milestone' ? 0 : Number(formData.duration || 1),
             task_dependencies: cleanDeps,

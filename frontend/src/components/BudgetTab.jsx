@@ -111,7 +111,7 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
 
     // --- Mutations ---
     const updateBudgetMutation = useMutation({
-        mutationFn: (newAmount) => api.patch(`/projects/${parseInt(projectId)}/`, { total_budget: parseFloat(newAmount) }),
+        mutationFn: (newAmount) => api.patch(`/projects/${projectId}/`, { total_budget: parseFloat(newAmount) }),
         onSuccess: async () => {
             // Wait for data to refresh before closing dialog
             await queryClient.invalidateQueries({ queryKey: ['project', projectId] });
@@ -129,7 +129,7 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
     });
 
     const addExpenseMutation = useMutation({
-        mutationFn: (data) => api.post('/budget/expenses/', { ...data, project: parseInt(projectId), category: parseInt(data.category) }),
+        mutationFn: (data) => api.post('/budget/expenses/', { ...data, project: projectId, category: data.category }),
         onSuccess: async () => {
             console.log('Expense added successfully, refreshing data...');
             // Invalidate with the same key used for fetching
@@ -162,7 +162,7 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
     });
 
     const updateExpenseMutation = useMutation({
-        mutationFn: ({ id, data }) => api.put(`/budget/expenses/${id}/`, { ...data, project: parseInt(projectId), category: parseInt(data.category) }),
+        mutationFn: ({ id, data }) => api.put(`/budget/expenses/${id}/`, { ...data, project: projectId, category: data.category }),
         onSuccess: async () => {
             // Wait for data to refresh before closing dialog
             await queryClient.invalidateQueries({ queryKey: ['expenses', projectId] });
@@ -214,7 +214,7 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
             if (categories.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
                 throw new Error('A category with this name already exists');
             }
-            return api.post('/budget/categories/', { name: trimmedName, project: parseInt(projectId) });
+            return api.post('/budget/categories/', { name: trimmedName, project: projectId });
         },
         onSuccess: async () => {
             console.log('Category added successfully, refreshing...');
@@ -304,7 +304,7 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
                         }
                     } else if (numericAmount > 0) {
                         return await api.post('/budget/monthly-budgets/', {
-                            project: parseInt(projectId),
+                            project: projectId,
                             month,
                             amount: numericAmount
                         });
