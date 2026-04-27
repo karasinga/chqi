@@ -104,13 +104,14 @@ CSRF_COOKIE_HTTPONLY = False   # Allow JS to read the token (required for SPA CS
 CSRF_USE_SESSIONS = False       # Ensure cookie-based CSRF is used
 SESSION_COOKIE_HTTPONLY = True  # Prevent JS from reading the session cookie (XSS protection)
 
-# Share cookies across all chqi.org subdomains
-SESSION_COOKIE_DOMAIN = '.chqi.org'
-CSRF_COOKIE_DOMAIN = '.chqi.org'
+# Domain scoping for cookies (Required if frontend and backend are on different subdomains)
+# For production chqi.org, set these to '.chqi.org' in your .env
+SESSION_COOKIE_DOMAIN = os.environ.get('SESSION_COOKIE_DOMAIN', None)
+CSRF_COOKIE_DOMAIN = os.environ.get('CSRF_COOKIE_DOMAIN', None)
 
-# Cross-domain cookie settings
-SESSION_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_SAMESITE = 'None'
+# SameSite policy (Lax is default; None is needed for cross-site if domains differ completely)
+SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
+CSRF_COOKIE_SAMESITE = os.environ.get('CSRF_COOKIE_SAMESITE', 'Lax')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -143,20 +144,33 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+# ─── Database ─────────────────────────────────────────────────────────────────
+# Switch via .env:
+#   USE_SQLITE=true   →  local SQLite  (great for dev / offline work)
+#   USE_SQLITE=false  →  PostgreSQL via DATABASE_URL  (production)
+#
+# The flag is checked FIRST, so even if DATABASE_URL is set it will be ignored
+# while USE_SQLITE=true — no need to comment out any lines.
 
-# Database Configuration
-# Uses DATABASE_URL environment variable if present.
-# Otherwise, constructs it from DB_* environment variables.
-# Falls back to local SQLite for easy development.
+_use_sqlite = os.environ.get('USE_SQLITE', 'false').lower() in ('true', '1', 'yes')
 
-if os.environ.get('DATABASE_URL'):
+if _use_sqlite:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+    _db_label = f"SQLite  →  {BASE_DIR / 'db.sqlite3'}"
+
+elif os.environ.get('DATABASE_URL'):
     DATABASES = {
         'default': dj_database_url.config(conn_max_age=600)
     }
+    _db_label = f"PostgreSQL (DATABASE_URL)"
+
 elif os.environ.get('DB_NAME'):
-    # Direct dictionary configuration is more robust than URL strings for some drivers
+    # Direct dict config — more robust than URL strings for some drivers/SSL setups
     DATABASES = {
         'default': {
             'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
@@ -167,16 +181,22 @@ elif os.environ.get('DB_NAME'):
             'PORT': os.environ.get('DB_PORT', '5432'),
             'OPTIONS': {
                 'sslmode': os.environ.get('DB_SSLMODE', 'prefer'),
-            }
+            },
         }
     }
+    _db_label = f"PostgreSQL ({os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT', '5432')}/{os.environ.get('DB_NAME')})"
+
 else:
+    # Final fallback — no env vars set at all
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+    _db_label = f"SQLite (fallback)  →  {BASE_DIR / 'db.sqlite3'}"
+
+print(f"[settings] DB backend: {_db_label}")
 
 
 # Password validation

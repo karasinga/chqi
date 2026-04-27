@@ -2,33 +2,40 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000') +
 let manualCsrfToken = null;
 
 const handleResponse = async (response) => {
-    if (!response.ok) {
-        let errorData = {};
+    let data = null;
+    if (response.status !== 204) {
         try {
-            errorData = await response.json();
+            data = await response.json();
         } catch (e) {
             // No JSON body
         }
+    }
 
+    if (!response.ok) {
         if (response.status === 403) {
             console.error('[API 403] Forbidden. Check CSRF token or session.', {
                 url: response.url,
-                hasCsrfToken: !!getCookie('csrftoken'),
-                error: errorData.message || response.statusText
+                hasCsrfToken: !!(manualCsrfToken || getCookie('csrftoken')),
+                error: (data && data.message) || response.statusText
             });
         }
 
         // Attach response data to the error so mutations can access field errors
-        const error = new Error(errorData.message || errorData.detail || `API error: ${response.status}`);
+        const error = new Error((data && (data.message || data.detail)) || `API error: ${response.status}`);
         error.response = {
-            data: errorData,
+            data: data,
             status: response.status,
             statusText: response.statusText
         };
         throw error;
     }
-    if (response.status === 204) return null;
-    return response.json();
+
+    // Auto-capture CSRF token if returned in response body
+    if (data && data.csrfToken) {
+        api.setToken(data.csrfToken);
+    }
+
+    return data;
 };
 
 const getCookie = (name) => {

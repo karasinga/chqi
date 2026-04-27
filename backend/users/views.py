@@ -42,7 +42,11 @@ class UserViewSet(viewsets.ModelViewSet):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             auth_login(request, user)
-            return Response({'detail': 'Successfully logged in.', 'user': UserSerializer(user).data})
+            return Response({
+                'detail': 'Successfully logged in.', 
+                'user': UserSerializer(user).data,
+                'csrfToken': get_token(request)
+            })
         else:
             return Response({'detail': 'Invalid credentials'}, status=401)
 
@@ -55,7 +59,9 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def me(self, request):
         if request.user.is_authenticated:
-            return Response(UserSerializer(request.user).data)
+            data = UserSerializer(request.user).data
+            data['csrfToken'] = get_token(request)
+            return Response(data)
         return Response({'detail': 'Not authenticated'}, status=401)
 
     @action(detail=False, methods=['post'], permission_classes=[])
