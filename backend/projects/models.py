@@ -1,9 +1,11 @@
 from django.db import models
 import os
+import uuid
 from django.conf import settings
 
 
 class Project(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     start_date = models.DateField()
@@ -66,6 +68,12 @@ class FileFolder(models.Model):
             ]
         }
 
+def get_project_upload_path(instance, filename):
+    """
+    Organizes files into project-specific folders: media/projects/<uuid>/files/<filename>
+    """
+    return f'projects/{instance.project.id}/files/{filename}'
+
 class ProjectFile(models.Model):
     FILE_TYPE_CHOICES = [
         ('excel', 'Excel'),
@@ -80,7 +88,7 @@ class ProjectFile(models.Model):
 
     project = models.ForeignKey(Project, related_name='files', on_delete=models.CASCADE)
     folder = models.ForeignKey(FileFolder, null=True, blank=True, related_name='files', on_delete=models.CASCADE)
-    file = models.FileField(upload_to='project_files/')
+    file = models.FileField(upload_to=get_project_upload_path)
     file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES, default='other')
     file_size = models.BigIntegerField(default=0)  # in bytes
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='uploaded_files')

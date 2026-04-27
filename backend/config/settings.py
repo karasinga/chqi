@@ -161,7 +161,7 @@ if _use_sqlite:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-    _db_label = f"SQLite  →  {BASE_DIR / 'db.sqlite3'}"
+    _db_label = f"SQLite  ->  {BASE_DIR / 'db.sqlite3'}"
 
 elif os.environ.get('DATABASE_URL'):
     DATABASES = {
@@ -194,7 +194,7 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-    _db_label = f"SQLite (fallback)  →  {BASE_DIR / 'db.sqlite3'}"
+    _db_label = f"SQLite (fallback)  ->  {BASE_DIR / 'db.sqlite3'}"
 
 print(f"[settings] DB backend: {_db_label}")
 

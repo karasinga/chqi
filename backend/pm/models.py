@@ -176,7 +176,7 @@ class ActivityLog(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     target_type = models.CharField(max_length=50)  # e.g., 'Project', 'Task'
-    target_id = models.IntegerField(null=True, blank=True)
+    target_id = models.CharField(max_length=255, null=True, blank=True)
     target_name = models.CharField(max_length=255)
     timestamp = models.DateTimeField(auto_now_add=True)
 
