@@ -399,7 +399,7 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
         // Build clean payload
         const cleanDeps = formData.task_dependencies
             .filter(d => d.predecessor_id)
-            .map(d => ({ predecessor_id: Number(d.predecessor_id), type: d.type || 'FS', lag: Number(d.lag || 0) }));
+            .map(d => ({ predecessor_id: d.predecessor_id, type: d.type || 'FS', lag: Number(d.lag || 0) }));
 
         const cleanData = {
             name: formData.name,
@@ -429,9 +429,7 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
     const isWorkPackage = formData.task_type === 'work_package';
 
     // Get raw project tasks, then sort hierarchically
-    const rawProjectTasks = allTasks.filter(t =>
-        t.project === Number(formData.project) || t.project === formData.project
-    );
+    const rawProjectTasks = allTasks.filter(t => t.project === formData.project);
     const projectTasks = buildTreeFlat(rawProjectTasks);
     const summaryTasks = projectTasks.filter(t => t.task_type === 'summary_task');
     const constraintNeedsDate = formData.constraint_type && formData.constraint_type !== 'as_soon_as_possible';
