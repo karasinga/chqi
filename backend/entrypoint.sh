@@ -33,7 +33,7 @@ python manage.py collectstatic --noinput
 # ─── Start Production Server ──────────────────────────────────────────────────
 echo "Starting gunicorn..."
 exec gunicorn config.wsgi:application \
-  --bind 0.0.0.0:8000 \
+  --bind 0.0.0.0:8080 \
   --workers 2 \
   --timeout 120 \
   --log-level info
