@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXTRACTOR_REPO: ${{ vars.KHIS_EXTRACTOR_REPO || 'karasinga/khis-extractor' }}
+  EXTRACTOR_REPO: ${{ vars.KHIS_EXTRACTOR_REPO || 'karasinga/khis_data_extraction' }}
 
 jobs:
   extract-load:
