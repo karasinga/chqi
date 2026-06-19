@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'pm',
     'budget',
     'researchers',
+    'dmh_dashboard',
 ]
 
 MIDDLEWARE = [
