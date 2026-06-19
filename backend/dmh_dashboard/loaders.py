@@ -81,11 +81,14 @@ def upsert_analytics(df, profile, as_of_date, log=None, chunksize=5000):
     df = _clean_df(df)
     recs = _records(df, ANALYTICS_MAP, profile, as_of_date)
     total = 0
-    # Single transaction: avoids per-chunk autocommit (disk sync storm),
-    # especially on SQLite. All-or-nothing per file.
-    with transaction.atomic():
-        for i in range(0, len(recs), chunksize):
-            chunk = [DmhAnalyticsFact(**r) for r in recs[i:i + chunksize]]
+    # One transaction per chunk (not per file). A file-scoped transaction held
+    # 200k+ rows of WAL alive at once, which OOM'd hosted Postgres
+    # ("server closed the connection unexpectedly") and also slowed SQLite
+    # with autocommit-per-chunk. Per-chunk atomic = bounded memory + still
+    # avoids per-statement commit overhead.
+    for i in range(0, len(recs), chunksize):
+        chunk = [DmhAnalyticsFact(**r) for r in recs[i:i + chunksize]]
+        with transaction.atomic():
             DmhAnalyticsFact.objects.bulk_create(
                 chunk,
                 update_conflicts=True,
@@ -95,7 +98,7 @@ def upsert_analytics(df, profile, as_of_date, log=None, chunksize=5000):
                     'facility', 'country', 'county', 'subcounty', 'ward', 'as_of_date',
                 ],
             )
-            total += len(chunk)
+        total += len(chunk)
 
     if log is not None:
         log.rows_upserted = total
@@ -110,9 +113,9 @@ def upsert_reporting(df, profile, as_of_date, log=None, chunksize=5000):
     df = _clean_df(df)
     recs = _records(df, REPORTING_MAP, profile, as_of_date)
     total = 0
-    with transaction.atomic():
-        for i in range(0, len(recs), chunksize):
-            chunk = [DmhReportingFact(**r) for r in recs[i:i + chunksize]]
+    for i in range(0, len(recs), chunksize):
+        chunk = [DmhReportingFact(**r) for r in recs[i:i + chunksize]]
+        with transaction.atomic():
             DmhReportingFact.objects.bulk_create(
                 chunk,
                 update_conflicts=True,
@@ -124,7 +127,7 @@ def upsert_reporting(df, profile, as_of_date, log=None, chunksize=5000):
                     'facility', 'country', 'county', 'subcounty', 'ward', 'as_of_date',
                 ],
             )
-            total += len(chunk)
+        total += len(chunk)
 
     if log is not None:
         log.rows_upserted = total
