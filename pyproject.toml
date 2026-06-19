@@ -1,0 +1,8 @@
+[tool.pyrefly]
+# Tell pyrefly which Python installation's site-packages to resolve imports from.
+# Without this, pyrefly guesses and falls back to the global C:\Python314 install,
+# which has none of the project's dependencies — producing false "missing-import"
+# errors. This points it at the project virtualenv (Python 3.13 + all deps).
+python_interpreter = "venv/Scripts/python.exe"
+# pyrefly infers the import root from the project layout automatically, so no
+# extra search paths are needed here.

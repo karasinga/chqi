@@ -1,0 +1,8 @@
+# Development / type-checking dependencies.
+# Install with:  pip install -r requirements-dev.txt
+# (not shipped to production — these power static analysis only)
+-r requirements.txt
+
+# Type stubs for Django, used by pyrefly/mypy/pyright for static type checking.
+# Pinned to match the installed Django major.minor (6.0).
+django-stubs==6.0.5
