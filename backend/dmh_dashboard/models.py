@@ -106,3 +106,115 @@ class DmhReportingFact(models.Model):
 
     def __str__(self):
         return f"{self.profile} | {self.org_unit_id} | {self.period_id} | {self.metric}"
+
+
+class DmhEchisScreeningData(models.Model):
+    location_name = models.CharField(max_length=255)
+    metric = models.CharField(max_length=255)
+    last_1_month = models.IntegerField(default=0)
+    last_month = models.IntegerField(default=0)
+    last_3_months = models.IntegerField(default=0)
+    last_6_months = models.IntegerField(default=0)
+    year_to_date_ytd = models.IntegerField(default=0)
+    last_12_months = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.location_name} | {self.metric}"
+
+
+class DmhKamiliNurse(models.Model):
+    s_no = models.IntegerField()
+    county = models.CharField(max_length=255)
+    work_station = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"{self.county} | {self.work_station}"
+
+
+class DmhNationalPsychHr(models.Model):
+    location = models.CharField(max_length=255)
+    mental_health_nurses = models.IntegerField(default=0)
+    mental_health_clinical_officers = models.IntegerField(default=0)
+    psychiatrist_consultant = models.IntegerField(default=0)
+
+    def __str__(self):
+        return self.location
+
+
+class DmhMergedEchisKhisData(models.Model):
+    county = models.CharField(max_length=255)
+    sub_county = models.CharField(max_length=255)
+    community_unit = models.CharField(max_length=255)
+    metric_id = models.CharField(max_length=255)
+    period_start = models.DateTimeField()
+    sum = models.IntegerField(default=0)
+    community_unit_standardized = models.CharField(max_length=255, blank=True, default='')
+    community_unit_id = models.CharField(max_length=50, blank=True, default='')
+    community_unit_name = models.CharField(max_length=255, blank=True, default='')
+    facility_id = models.CharField(max_length=50, blank=True, default='')
+    facility_name = models.CharField(max_length=255, blank=True, default='')
+    ward = models.CharField(max_length=255, blank=True, default='')
+    subcounty = models.CharField(max_length=255, blank=True, default='')
+    county_standardized = models.CharField(max_length=255, blank=True, default='')
+    country = models.CharField(max_length=255, blank=True, default='')
+    is_matched = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.county} | {self.community_unit} | {self.metric_id}"
+
+
+class DmhAllKhisFacilities(models.Model):
+    org_unit_id = models.CharField(max_length=50, primary_key=True)
+    facility = models.CharField(max_length=255)
+    ward = models.CharField(max_length=255, blank=True, default='')
+    subcounty = models.CharField(max_length=255, blank=True, default='')
+    county = models.CharField(max_length=255, blank=True, default='')
+    country = models.CharField(max_length=255, blank=True, default='')
+    name = models.CharField(max_length=255, blank=True, null=True)
+    display_name = models.CharField(max_length=255, blank=True, default='')
+    facility_type = models.CharField(max_length=255, blank=True, default='')
+
+    def __str__(self):
+        return self.facility
+
+
+class DmhEchisScreeningReferral(models.Model):
+    county = models.CharField(max_length=255)
+    sub_county = models.CharField(max_length=255)
+    community_unit = models.CharField(max_length=255)
+    metric_id = models.CharField(max_length=255)
+    period_start = models.DateTimeField()
+    sum = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.county} | {self.community_unit} | {self.metric_id}"
+
+
+class DmhAllFacilitiesWithCuInfo(models.Model):
+    org_unit_id = models.CharField(max_length=50, primary_key=True)
+    facility = models.CharField(max_length=255)
+    ward = models.CharField(max_length=255, blank=True, default='')
+    subcounty = models.CharField(max_length=255, blank=True, default='')
+    county = models.CharField(max_length=255, blank=True, default='')
+    country = models.CharField(max_length=255, blank=True, default='')
+    cu_status = models.CharField(max_length=255, blank=True, default='')
+    cu_count = models.IntegerField(default=0)
+    community_units_list = models.TextField(blank=True, null=True)
+    has_cus = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.facility
+
+
+class DmhCuFacilityMapping(models.Model):
+    community_unit_id = models.CharField(max_length=50)
+    community_unit_name = models.CharField(max_length=255)
+    facility_id = models.CharField(max_length=50)
+    facility_name = models.CharField(max_length=255)
+    ward = models.CharField(max_length=255, blank=True, default='')
+    subcounty = models.CharField(max_length=255, blank=True, default='')
+    county = models.CharField(max_length=255, blank=True, default='')
+    country = models.CharField(max_length=255, blank=True, default='')
+
+    def __str__(self):
+        return f"{self.community_unit_name} -> {self.facility_name}"
