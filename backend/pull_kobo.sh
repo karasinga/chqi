@@ -22,6 +22,10 @@ fi
 
 echo "Using: $PYTHON ($($PYTHON --version 2>&1))"
 
-$PYTHON manage.py pull_kobo --scheduled
+if [ $# -eq 0 ]; then
+    $PYTHON manage.py pull_kobo --scheduled
+else
+    $PYTHON manage.py pull_kobo "$@"
+fi
 
 echo "Finished at: $(date)"
