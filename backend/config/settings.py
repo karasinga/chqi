@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'budget',
     'researchers',
     'dmh_dashboard',
+    'kobo',
 ]
 
 MIDDLEWARE = [
@@ -363,3 +364,14 @@ if not DEBUG:
 LOGS_DIR = BASE_DIR / 'logs'
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
+
+# ─── KoboToolbox Configuration ────────────────────────────────────────────────
+KOBO_TOKEN = os.environ.get('KOBO_TOKEN')
+KOBO_FORM_ID = os.environ.get('KOBO_FORM_ID')
+KOBO_BASE_URL = os.environ.get('KOBO_BASE_URL', 'https://kf.kobotoolbox.org').rstrip('/')
+
+ADMINS = [
+    ('System Admin', os.environ.get('DEFAULT_FROM_EMAIL', 'admin@chqi.org')),
+]
+MANAGERS = ADMINS
+

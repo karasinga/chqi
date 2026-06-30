@@ -1,0 +1,1 @@
+# Kobo management commands initialization
