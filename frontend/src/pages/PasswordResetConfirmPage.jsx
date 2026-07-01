@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Button,
@@ -16,7 +16,8 @@ import {
     Visibility,
     VisibilityOff,
     CheckCircleOutline as CheckIcon,
-    ArrowBack as ArrowBackIcon
+    ArrowBack as ArrowBackIcon,
+    ErrorOutline as ErrorIcon
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { keyframes } from '@mui/system';
@@ -48,12 +49,30 @@ const PasswordResetConfirmPage = () => {
     const token = params['*']?.replace(/\/+$/, '').replace(/=+$/, '');
     const navigate = useNavigate();
 
+    const [checking, setChecking] = useState(true);
+    const [tokenValid, setTokenValid] = useState(false);
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        const verifyToken = async () => {
+            try {
+                const res = await api.get('/users/password_reset_verify/', {
+                    params: { uid: uidb64, token }
+                });
+                setTokenValid(res.data.valid === true);
+            } catch {
+                setTokenValid(false);
+            } finally {
+                setChecking(false);
+            }
+        };
+        verifyToken();
+    }, [uidb64, token]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -259,12 +278,22 @@ const PasswordResetConfirmPage = () => {
                                 fontSize: { xs: '1.75rem', sm: '2rem' },
                             }}
                         >
-                            {successMsg ? 'Password Reset!' : 'Create New Password'}
+                            {successMsg
+                                ? 'Password Reset!'
+                                : checking
+                                    ? 'Verifying Link...'
+                                    : tokenValid
+                                        ? 'Create New Password'
+                                        : 'Invalid Link'}
                         </Typography>
                         <Typography sx={{ color: colors.gray, fontSize: '0.95rem' }}>
                             {successMsg
                                 ? 'Redirecting you to login...'
-                                : 'Your new password must be at least 8 characters.'}
+                                : checking
+                                    ? 'Please wait...'
+                                    : tokenValid
+                                        ? 'Your new password must be at least 8 characters.'
+                                        : 'This reset link is invalid or has expired.'}
                         </Typography>
                     </Box>
 
@@ -301,8 +330,44 @@ const PasswordResetConfirmPage = () => {
                         </Alert>
                     )}
 
+                    {/* Loading */}
+                    {checking && !successMsg && (
+                        <Box sx={{ textAlign: 'center', py: 4 }}>
+                            <CircularProgress sx={{ color: colors.teal }} />
+                        </Box>
+                    )}
+
+                    {/* Invalid / Expired */}
+                    {!checking && !tokenValid && !successMsg && (
+                        <Box sx={{ textAlign: 'center', py: 2 }}>
+                            <ErrorIcon sx={{ fontSize: 64, color: '#EF4444', mb: 2 }} />
+                            <Alert
+                                severity="error"
+                                sx={{
+                                    mb: 3,
+                                    borderRadius: 2.5,
+                                    border: '1px solid #FECACA',
+                                    bgcolor: '#FEF2F2',
+                                }}
+                            >
+                                This reset link is invalid or has expired. Please request a new password reset.
+                            </Alert>
+                            <Button
+                                component={RouterLink}
+                                to="/login"
+                                variant="contained"
+                                sx={{
+                                    ...primaryButtonSx,
+                                    px: 4,
+                                }}
+                            >
+                                Go to Login
+                            </Button>
+                        </Box>
+                    )}
+
                     {/* Form */}
-                    {!successMsg && (
+                    {!checking && tokenValid && !successMsg && (
                         <form onSubmit={handleSubmit}>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                                 <TextField

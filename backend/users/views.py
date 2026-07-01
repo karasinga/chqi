@@ -97,6 +97,26 @@ class UserViewSet(viewsets.ModelViewSet):
                 return Response({'detail': f'Backend error: {str(e)}'}, status=500)
         return Response({'detail': 'Invalid email.'}, status=400)
 
+    @action(detail=False, methods=['get'], permission_classes=[], url_path='password_reset_verify')
+    def password_reset_verify(self, request):
+        uidb64 = request.query_params.get('uid')
+        token = request.query_params.get('token')
+
+        if not uidb64 or not token:
+            return Response({'valid': False}, status=400)
+
+        if uidb64.endswith('/'): uidb64 = uidb64[:-1]
+        if token.endswith('/'): token = token[:-1]
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({'valid': False})
+
+        token_valid = default_token_generator.check_token(user, token)
+        return Response({'valid': token_valid})
+
     @action(detail=False, methods=['post'], permission_classes=[], url_path='password_reset_confirm')
     def password_reset_confirm(self, request):
         uidb64 = request.data.get('uid')
