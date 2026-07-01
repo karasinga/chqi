@@ -250,14 +250,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Dev: emails print to terminal (see the banner with the reset link)
 # Prod: set the environment variables below and set EMAIL_USE_SMTP=true
 #
-# Required env vars for production SMTP:
+# Required env vars for production SMTP (set in Coolify):
 #   EMAIL_USE_SMTP=true
-#   EMAIL_HOST=smtp.yourprovider.com   (e.g. smtp.gmail.com)
+#   EMAIL_HOST=smtp.gmail.com
 #   EMAIL_PORT=587
-#   EMAIL_HOST_USER=your@email.com
-#   EMAIL_HOST_PASSWORD=yourpassword
-#   DEFAULT_FROM_EMAIL=CHQI Dashboard <no-reply@chqi.org>
-#   FRONTEND_URL=https://yourdomain.com  (used in reset link)
+#   EMAIL_HOST_USER=peterm@example.ac.ke
+#   EMAIL_HOST_PASSWORD=your_app_password
+#   DEFAULT_FROM_EMAIL=CHQI Dashboard <peterm@example.ac.ke>
+#   SERVER_EMAIL=peterm@example.ac.ke       (sender for mail_admins alerts)
+#   FRONTEND_URL=https://yourdomain.com      (used in password reset link)
 
 _use_smtp = os.environ.get('EMAIL_USE_SMTP', 'false').lower() == 'true'
 
@@ -268,7 +269,8 @@ if _use_smtp:
     EMAIL_USE_TLS = True
     EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
     EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'CHQI Dashboard <no-reply@chqi.org>')
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'CHQI Dashboard <noreply@chqi.org>')
+    SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 else:
     # Development — prints to terminal with a clear banner
     EMAIL_BACKEND = 'config.email_backend.NoWrapConsoleEmailBackend'
@@ -371,7 +373,7 @@ KOBO_FORM_ID = os.environ.get('KOBO_FORM_ID')
 KOBO_BASE_URL = os.environ.get('KOBO_BASE_URL', 'https://kf.kobotoolbox.org').rstrip('/')
 
 ADMINS = [
-    ('System Admin', os.environ.get('DEFAULT_FROM_EMAIL', 'admin@chqi.org')),
+    ('System Admin', os.environ.get('SERVER_EMAIL') or os.environ.get('DEFAULT_FROM_EMAIL', 'admin@chqi.org')),
 ]
 MANAGERS = ADMINS
 
