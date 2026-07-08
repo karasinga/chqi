@@ -22,6 +22,7 @@ import {
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { keyframes } from '@mui/system';
 import api from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 // Brand Colors
 const colors = {
@@ -48,6 +49,7 @@ const PasswordResetConfirmPage = () => {
     const uidb64 = params.uidb64;
     const token = params['*']?.replace(/\/+$/, '');
     const navigate = useNavigate();
+    const { logout } = useAuth();
 
     const [checking, setChecking] = useState(true);
     const [tokenValid, setTokenValid] = useState(false);
@@ -100,6 +102,14 @@ const PasswordResetConfirmPage = () => {
             setSuccessMsg('Your password has been successfully reset!');
             setPassword('');
             setConfirmPassword('');
+
+            // Clear any active session (e.g. an admin testing the invite link in
+            // the same browser) so we don't land back in as someone else.
+            try {
+                await logout();
+            } catch {
+                // ignore — there may be no session to clear
+            }
 
             setTimeout(() => {
                 navigate('/login');
