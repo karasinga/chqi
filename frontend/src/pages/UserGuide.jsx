@@ -148,10 +148,10 @@ const OverviewPanel = () => (
         <Box sx={{ p: 4, borderRadius: 3, background: `linear-gradient(135deg, ${tk.navy} 0%, ${tk.navyLight} 100%)`, color: '#fff', mb: 4, position: 'relative', overflow: 'hidden' }}>
             <Box sx={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', bgcolor: alpha('#fff', 0.05) }} />
             <SectionBadge label="USER GUIDE" color="#fff" />
-            <Typography variant="h4" sx={{ fontWeight: 900, mt: 2, mb: 1, letterSpacing: '-0.5px' }}>
+            <Typography variant="h4" sx={{ fontWeight: 900, mt: 2, mb: 1, letterSpacing: '-0.5px', color: '#ffffff' }}>
                 CHQI Project Management Platform
             </Typography>
-            <Typography variant="body1" sx={{ opacity: 0.85, lineHeight: 1.7, maxWidth: 680 }}>
+            <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.9)', lineHeight: 1.7, maxWidth: 680 }}>
                 A professional-grade project scheduling tool powered by the <strong>Critical Path Method (CPM)</strong>.
                 Enter task durations and dependencies — the engine automatically computes all dates, identifies the critical path,
                 and keeps your schedule up to date.
@@ -746,7 +746,7 @@ const UserGuide = () => {
                     <Typography variant="h4" sx={{ fontWeight: 900, color: tk.navy, letterSpacing: '-0.5px' }}>
                         User Guide
                     </Typography>
-                    <Chip label="v2.0" size="small" sx={{ bgcolor: alpha(tk.teal, 0.15), color: tk.teel, fontWeight: 800, border: `1px solid ${alpha(tk.teal, 0.3)}` }} />
+                    <Chip label="v2.0" size="small" sx={{ bgcolor: alpha(tk.teal, 0.15), color: tk.teal, fontWeight: 800, border: `1px solid ${alpha(tk.teal, 0.3)}` }} />
                 </Stack>
                 <Typography variant="body1" sx={{ color: tk.textSecondary, ml: 5 }}>
                     Complete reference for the CHQI Project Management & CPM Scheduling Platform
