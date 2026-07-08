@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import ProjectDetail from './pages/ProjectDetails';
 import PasswordResetConfirmPage from './pages/PasswordResetConfirmPage';
 import UserGuide from './pages/UserGuide';
+import { isLandingDomain, DASHBOARD_BASE_URL } from './utils/site';
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,17 @@ const PublicRoute = ({ children }) => {
     return children;
 };
 
+// On the landing domain (chqi.org) there is no app — send auth-related routes
+// to the real app on dashboards.chqi.org, preserving the path (e.g. reset tokens).
+const ExternalRedirect = ({ base = DASHBOARD_BASE_URL }) => {
+    React.useEffect(() => {
+        const { pathname, search, hash } = window.location;
+        window.location.replace(`${base}${pathname}${search}${hash}`);
+    }, [base]);
+
+    return <LoadingScreen />;
+};
+
 const AppRoutes = () => {
     return (
         <Routes>
@@ -66,12 +78,25 @@ const AppRoutes = () => {
             <Route
                 path="/login"
                 element={
-                    <PublicRoute>
-                        <LandingPage />
-                    </PublicRoute>
+                    isLandingDomain() ? (
+                        <ExternalRedirect />
+                    ) : (
+                        <PublicRoute>
+                            <LandingPage />
+                        </PublicRoute>
+                    )
                 }
             />
-            <Route path="/reset-password/:uidb64/*" element={<PasswordResetConfirmPage />} />
+            <Route
+                path="/reset-password/:uidb64/*"
+                element={
+                    isLandingDomain() ? (
+                        <ExternalRedirect />
+                    ) : (
+                        <PasswordResetConfirmPage />
+                    )
+                }
+            />
 
             {/* Protected Routes */}
             <Route
