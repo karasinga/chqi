@@ -1,6 +1,6 @@
 Welcome to CHQI Dashboard
 
-Hello {{ user.username }},
+Hello {{ user.username|title }},
 
 You have been invited to join the CHQI Dashboard as a {{ user.role }}.
 Your login username is: {{ login }}
