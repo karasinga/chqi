@@ -185,3 +185,34 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.user.username} {self.action} {self.target_type} {self.target_name}"
+
+
+class Notification(models.Model):
+    """Per-user notification (assignment, status change, comment, due-soon, etc.)."""
+
+    TYPE_CHOICES = [
+        ('assignment', 'Assignment'),
+        ('status', 'Status Change'),
+        ('comment', 'Comment'),
+        ('due_soon', 'Due Soon'),
+        ('overdue', 'Overdue'),
+        ('system', 'System'),
+    ]
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='notifications')
+    actor_name = models.CharField(max_length=255, blank=True, default='')
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='system')
+    message = models.TextField()
+    link = models.CharField(max_length=255, blank=True, default='')
+    target_type = models.CharField(max_length=50, blank=True, default='')
+    target_id = models.CharField(max_length=255, blank=True, default='')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Notification -> {self.recipient.username}: {self.message[:50]}"

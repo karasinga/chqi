@@ -31,6 +31,7 @@ import {
     Timer as TimerIcon
 } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 
 // ... (existing code)
@@ -88,6 +89,7 @@ const getOverdueInfo = (task) => {
 const TaskManagement = () => {
     const [searchParams] = useSearchParams();
     const queryClient = useQueryClient();
+    const { user } = useAuth();
 
     // UI State
     const [view, setView] = useState('kanban');
@@ -187,6 +189,13 @@ const TaskManagement = () => {
             }
         }
     }, [tasks, searchParams]);
+
+    // Deep-link from the sidebar "Tasks" badge: ?mine=1 → show only my tasks
+    useEffect(() => {
+        if (searchParams.get('mine') && user?.id) {
+            setFilterAssignee(String(user.id));
+        }
+    }, [searchParams, user]);
 
     const onDragEnd = (result) => {
         if (!result.destination) return;
