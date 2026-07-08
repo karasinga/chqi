@@ -60,7 +60,7 @@ const Layout = ({ children }) => {
 
     const searchOptions = [
         { title: 'Dashboard', path: '/', icon: <DashboardIcon fontSize="small" /> },
-        { title: 'Tasks Management', path: '/tasks', icon: <AssignmentIcon fontSize="small" /> },
+        { title: 'Tasks Management', path: '/tasks?mine=1', icon: <AssignmentIcon fontSize="small" /> },
         { title: 'Portfolio Dashboard', path: '/portfolio', icon: <TrendingUpIcon fontSize="small" /> },
         { title: 'User Settings', path: '/settings', icon: <SettingsIcon fontSize="small" /> },
         { title: 'User Guide / Help', path: '/guide', icon: <HelpOutlineIcon fontSize="small" /> },

@@ -4,7 +4,7 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, MenuItem, FormControl, InputLabel, Select,
     Chip, Box, Typography, InputAdornment, Avatar, Divider, Stack,
-    Grid, Tooltip, ToggleButton, ToggleButtonGroup, Accordion,
+    Grid, Tooltip, ToggleButton, ToggleButtonGroup, Accordion, Autocomplete,
     AccordionSummary, AccordionDetails, Paper, IconButton, Alert,
 } from '@mui/material';
 import {
@@ -25,6 +25,8 @@ import {
     Lock as LockIcon,
 } from '@mui/icons-material';
 import api from '../utils/api';
+import { useAuth } from '../context/AuthContext';
+import { userLabel } from '../utils/user';
 
 // ─── Brand tokens ───────────────────────────────────────────────
 const tok = {
@@ -274,8 +276,14 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
     // ── Data queries ────────────────────────────────────────────
     const { data: users = [] } = useQuery({
         queryKey: ['users'],
-        queryFn: () => api.get('/users/users/'),
+        queryFn: () => api.get('/users/'),
     });
+    const { user } = useAuth();
+    // Assignable users: hidden from non-admins, sorted A–Z by display name.
+    const assigneeOptions = (users || [])
+        .filter(u => (user?.is_superuser) || !u.is_superuser)
+        .sort((a, b) => userLabel(a).localeCompare(userLabel(b)));
+    const assigneeUser = assigneeOptions.find(u => u.id === Number(formData.assignee)) || null;
     const { data: comments = [] } = useQuery({
         queryKey: ['comments', task?.id],
         queryFn: () => api.get(`/pm/comments/?task=${task.id}`),
@@ -718,24 +726,31 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
                     </Grid>
 
                     {/* ── Assignee ─────────────────────────────── */}
-                    <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}>
-                        <InputLabel>Assignee</InputLabel>
-                        <Select
-                            name="assignee"
-                            value={formData.assignee}
-                            onChange={handleChange}
-                            label="Assignee"
-                            disabled={viewMode}
-                            startAdornment={<AssigneeIcon sx={{ mr: 1, color: 'action.active', fontSize: 20 }} />}
-                        >
-                            <MenuItem value=""><em>Unassigned</em></MenuItem>
-                            {users.map(u => (
-                                <MenuItem key={u.id} value={u.id}>
-                                    {u.first_name} {u.last_name} ({u.username})
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
+                    <Autocomplete
+                        options={assigneeOptions}
+                        getOptionLabel={(o) => userLabel(o)}
+                        value={assigneeUser}
+                        onChange={(_, val) => setFormData(prev => ({ ...prev, assignee: val ? val.id : '' }))}
+                        isOptionEqualToValue={(o, v) => o.id === v.id}
+                        disabled={viewMode}
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                label="Assignee"
+                                placeholder={viewMode ? '' : 'Search people…'}
+                                InputProps={{
+                                    ...params.InputProps,
+                                    startAdornment: (
+                                        <>
+                                            <AssigneeIcon sx={{ mr: 1, color: 'action.active', fontSize: 20 }} />
+                                            {params.InputProps.startAdornment}
+                                        </>
+                                    ),
+                                }}
+                            />
+                        )}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                    />
 
                     {/* ── Predecessors (typed dependency rows) ─── */}
                     <Box>
