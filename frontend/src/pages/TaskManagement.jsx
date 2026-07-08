@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    Box, Typography, Grid, Paper, Tabs, Tab, Button, IconButton,
+    Box, Typography, Grid, Paper, Tabs, Tab, Button, IconButton, ToggleButton, ToggleButtonGroup,
     Chip, Avatar, Stack, TextField, InputAdornment, Tooltip,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Menu, MenuItem, Divider, LinearProgress, Checkbox, FormControlLabel, FormGroup, Autocomplete,
@@ -31,6 +31,7 @@ import {
     Timer as TimerIcon
 } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 
 // ... (existing code)
@@ -88,6 +89,7 @@ const getOverdueInfo = (task) => {
 const TaskManagement = () => {
     const [searchParams] = useSearchParams();
     const queryClient = useQueryClient();
+    const { user } = useAuth();
 
     // UI State
     const [view, setView] = useState('kanban');
@@ -121,7 +123,7 @@ const TaskManagement = () => {
 
     const { data: users = [] } = useQuery({
         queryKey: ['users'],
-        queryFn: () => api.get('/users/users/'),
+        queryFn: () => api.get('/users/'),
         refetchInterval: 60000
     });
 
@@ -187,6 +189,13 @@ const TaskManagement = () => {
             }
         }
     }, [tasks, searchParams]);
+
+    // Deep-link from the sidebar "Tasks" badge: ?mine=1 → show only my tasks
+    useEffect(() => {
+        if (searchParams.get('mine') && user?.id) {
+            setFilterAssignee(String(user.id));
+        }
+    }, [searchParams, user]);
 
     const onDragEnd = (result) => {
         if (!result.destination) return;
@@ -483,14 +492,29 @@ const TaskManagement = () => {
                         Track and manage research tasks across all projects.
                     </Typography>
                 </Box>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    sx={{ borderRadius: 2, px: 3, fontWeight: 700 }}
-                    onClick={() => { setEditingTask(null); setOpenForm(true); }}
-                >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <ToggleButtonGroup
+                        size="small"
+                        exclusive
+                        value={filterAssignee === String(user?.id) ? 'mine' : (filterAssignee === 'all' ? 'all' : '')}
+                        onChange={(_, v) => { if (!v) return; setFilterAssignee(v === 'mine' ? String(user.id) : 'all'); }}
+                        sx={{
+                            '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, borderRadius: 2, border: '1px solid #e0e0e0', mx: 0.25 },
+                            '& .Mui-selected': { bgcolor: '#1baca715 !important', color: '#1baca7 !important', borderColor: '#1baca7 !important' }
+                        }}
+                    >
+                        <ToggleButton value="mine">My tasks</ToggleButton>
+                        <ToggleButton value="all">All tasks</ToggleButton>
+                    </ToggleButtonGroup>
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        sx={{ borderRadius: 2, px: 3, fontWeight: 700 }}
+                        onClick={() => { setEditingTask(null); setOpenForm(true); }}
+                    >
                     New Task
                 </Button>
+                </Box>
             </Box>
 
             {/* KPI Cards */}

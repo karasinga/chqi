@@ -1,9 +1,10 @@
 from datetime import timedelta
 import logging
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import Task, TaskComment, ActivityLog, Dependency
+from .models import Task, TaskComment, ActivityLog, Dependency, Notification
 from .serializers import TaskSerializer, TaskCommentSerializer, ActivityLogSerializer, DependencySerializer
 from .services.scheduling import schedule_project, calculate_cpm
 from .services.scheduleValidator import validate_schedule
@@ -28,6 +29,9 @@ class TaskViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
         task = serializer.save()
         self.log_activity(task, 'create')
         self._run_schedule(task.project_id)
+        # Notify the assignee (but not if they assigned it to themselves)
+        if task.assignee and self.request.user.is_authenticated and task.assignee != self.request.user:
+            self._notify_assignment(task, self.request.user)
 
     def perform_update(self, serializer):
         instance = Task.objects.get(pk=self.get_object().pk)
@@ -39,6 +43,9 @@ class TaskViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
         if old_assignee != task.assignee:
             target_name = f"{task.name} to {task.assignee.username if task.assignee else 'Unassigned'}"
             self.log_activity(task, 'assigned', target_name=target_name)
+            # Notify new assignee (skip if they reassigned to themselves)
+            if task.assignee and self.request.user.is_authenticated and task.assignee != self.request.user:
+                self._notify_assignment(task, self.request.user)
 
         if old_status != task.status:
             target_name = f"{task.name} to {task.get_status_display()}"
@@ -48,6 +55,18 @@ class TaskViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
             self.log_activity(task, 'update')
 
         self._run_schedule(task.project_id)
+
+    def _notify_assignment(self, task, actor_user):
+        """Create a notification for the task's assignee about a new/reassigned task."""
+        Notification.objects.create(
+            recipient=task.assignee,
+            actor_name=actor_user.username if actor_user else '',
+            type='assignment',
+            message=f"{actor_user.username if actor_user else 'Someone'} assigned you the task “{task.name}”.",
+            link=f"/projects/{task.project_id}?taskId={task.id}",
+            target_type='Task',
+            target_id=str(task.id),
+        )
 
     def _run_schedule(self, project_id):
         """Run full CPM scheduling for a project after any task change."""
@@ -135,6 +154,21 @@ class TaskViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
             'critical_path_tasks': critical_count,
             'overdue_tasks': overdue_count,
         })
+
+    @action(detail=False, methods=['get'])
+    def my_stats(self, request):
+        """Counts of tasks assigned to the current user — drives the sidebar Tasks badge."""
+        from datetime import date, timedelta
+        user = request.user
+        if not user.is_authenticated:
+            return Response({'open': 0, 'overdue': 0, 'due_soon': 0})
+        mine = Task.objects.filter(assignee=user).exclude(status='completed')
+        today = date.today()
+        soon = today + timedelta(days=7)
+        open_count = mine.count()
+        overdue = mine.filter(early_finish__lt=today).count()
+        due_soon = mine.filter(early_finish__gte=today, early_finish__lte=soon).count()
+        return Response({'open': open_count, 'overdue': overdue, 'due_soon': due_soon})
 
     @action(detail=False, methods=['get'])
     def portfolio_summary(self, request):
@@ -362,3 +396,34 @@ class FrontendLogViewSet(viewsets.ViewSet):
         else:
             logger.error(log_message)
         return Response({'status': 'logged'}, status=status.HTTP_201_CREATED)
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'actor_name', 'type', 'message', 'link', 'target_type',
+                  'target_id', 'is_read', 'created_at']
+
+
+class NotificationViewSet(viewsets.ViewSet):
+    """List notifications for the current user; mark read / fetch unread count."""
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        qs = Notification.objects.filter(recipient=request.user)
+        return Response(NotificationSerializer(qs, many=True).data)
+
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        count = Notification.objects.filter(
+            recipient=request.user, is_read=False).count()
+        return Response({'count': count})
+
+    @action(detail=False, methods=['post'])
+    def mark_read(self, request):
+        ids = request.data.get('ids') or []
+        qs = Notification.objects.filter(recipient=request.user, is_read=False)
+        if ids:
+            qs = qs.filter(id__in=ids)
+        updated = qs.update(is_read=True)
+        return Response({'updated': updated})

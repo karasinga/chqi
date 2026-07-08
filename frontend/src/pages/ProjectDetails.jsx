@@ -329,7 +329,7 @@ const ProjectDetails = () => {
 
     const { data: users = [] } = useQuery({
         queryKey: ['users'],
-        queryFn: () => api.get('/users/users/'),
+        queryFn: () => api.get('/users/'),
     });
 
     const cpmData = rawTasks;

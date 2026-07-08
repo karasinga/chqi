@@ -17,14 +17,20 @@ import {
     Search as SearchIcon,
     Notifications as NotificationsIcon,
     HelpOutline as HelpOutlineIcon,
+    PersonAdd as PersonAddIcon,
+    ChatBubbleOutline as ChatBubbleOutlineIcon,
+    SwapHoriz as SwapHorizIcon,
+    WarningAmber as WarningAmberIcon,
+    InfoOutlined as InfoOutlinedIcon,
 } from '@mui/icons-material';
 import { Link, useLocation } from 'react-router-dom';
 import { keyframes } from '@mui/system';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors } from '../theme/colors';
 import { useNavigate } from 'react-router-dom';
+import { timeAgo } from '../utils/time';
 
 // Animations
 const pulse = keyframes`
@@ -54,7 +60,7 @@ const Layout = ({ children }) => {
 
     const searchOptions = [
         { title: 'Dashboard', path: '/', icon: <DashboardIcon fontSize="small" /> },
-        { title: 'Tasks Management', path: '/tasks', icon: <AssignmentIcon fontSize="small" /> },
+        { title: 'Tasks Management', path: '/tasks?mine=1', icon: <AssignmentIcon fontSize="small" /> },
         { title: 'Portfolio Dashboard', path: '/portfolio', icon: <TrendingUpIcon fontSize="small" /> },
         { title: 'User Settings', path: '/settings', icon: <SettingsIcon fontSize="small" /> },
         { title: 'User Guide / Help', path: '/guide', icon: <HelpOutlineIcon fontSize="small" /> },
@@ -116,12 +122,6 @@ const Layout = ({ children }) => {
         setAnchorElNav(null);
     };
 
-    const dummyNotifications = [
-        { id: 1, text: 'New task assigned to you', time: '5m ago', unread: true },
-        { id: 2, text: 'Portfolio performance updated', time: '1h ago', unread: true },
-        { id: 3, text: 'System maintenance scheduled', time: '2h ago', unread: false }
-    ];
-
     const { data: onlineCountData } = useQuery({
         queryKey: ['onlineCount'],
         queryFn: () => api.get('/users/online_count/'),
@@ -131,12 +131,61 @@ const Layout = ({ children }) => {
     });
     const onlineCount = onlineCountData?.count || 0;
 
+    // ── Notifications (real, per-user; fetched on load only) ────────
+    const { data: unreadData } = useQuery({
+        queryKey: ['unreadCount'],
+        queryFn: () => api.get('/pm/notifications/unread_count/'),
+    });
+    const unreadCount = unreadData?.count ?? 0;
+
+    const { data: notificationsData } = useQuery({
+        queryKey: ['notifications'],
+        queryFn: () => api.get('/pm/notifications/'),
+    });
+    const notifications = notificationsData ?? [];
+
+    const queryClient = useQueryClient();
+    const markReadMutation = useMutation({
+        mutationFn: (ids) => api.post('/pm/notifications/mark_read/', ids ? { ids } : {}),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            queryClient.invalidateQueries({ queryKey: ['unreadCount'] });
+        },
+    });
+
+    const getNotifIcon = (type) => {
+        switch (type) {
+            case 'assignment': return <PersonAddIcon fontSize="small" />;
+            case 'comment': return <ChatBubbleOutlineIcon fontSize="small" />;
+            case 'status': return <SwapHorizIcon fontSize="small" />;
+            case 'due_soon':
+            case 'overdue': return <WarningAmberIcon fontSize="small" />;
+            default: return <InfoOutlinedIcon fontSize="small" />;
+        }
+    };
+
+    // ── My Tasks badge (open / overdue / due_soon) ─────────────────
+    const { data: myTasksData } = useQuery({
+        queryKey: ['myTasks'],
+        queryFn: () => api.get('/pm/tasks/my_stats/'),
+    });
+    const myOpen = myTasksData?.open ?? 0;
+    const myOverdue = myTasksData?.overdue ?? 0;
+    const myDueSoon = myTasksData?.due_soon ?? 0;
+    const tasksBadge = myOpen > 0 ? myOpen : null;
+    const tasksBadgeColor = myOverdue > 0
+        ? 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)'       // red — has overdue
+        : myDueSoon > 0
+            ? 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)'    // amber — due soon
+            : 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)';  // teal — all clear
+    const tasksTooltip = `${myOpen} open · ${myOverdue} overdue · ${myDueSoon} due soon`;
+
     const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
     const handleCollapseToggle = () => setCollapsed(!collapsed);
 
     const menuItems = [
         { text: 'Dashboard', icon: <DashboardIcon />, path: '/', badge: null },
-        { text: 'Tasks', icon: <AssignmentIcon />, path: '/tasks', badge: 5 },
+        { text: 'Tasks', icon: <AssignmentIcon />, path: '/tasks?mine=1', badge: null },
         { text: 'Portfolio Hub', icon: <TrendingUpIcon />, path: '/portfolio', badge: null },
         { text: 'Help Center', icon: <HelpOutlineIcon />, path: '/guide', badge: null },
         { text: 'Settings', icon: <SettingsIcon />, path: '/settings', badge: null },
@@ -258,8 +307,16 @@ const Layout = ({ children }) => {
                 )}
                 {menuItems.map((item) => {
                     const isActive = location.pathname === item.path;
+                    const isTasks = item.text === 'Tasks';
+                    const showBadge = isTasks ? tasksBadge : item.badge;
+                    const badgeColor = isTasks
+                        ? tasksBadgeColor
+                        : 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)';
+                    const tooltipTitle = isTasks
+                        ? tasksTooltip
+                        : (collapsed ? item.text : '');
                     return (
-                        <Tooltip key={item.text} title={collapsed ? item.text : ""} placement="right" arrow>
+                        <Tooltip key={item.text} title={tooltipTitle} placement="right" arrow>
                             <ListItem
                                 component={Link}
                                 to={item.path}
@@ -290,15 +347,15 @@ const Layout = ({ children }) => {
                                     justifyContent: 'center',
                                     color: 'inherit',
                                 }}>
-                                    {item.badge ? (
+                                    {showBadge ? (
                                         <Badge
-                                            badgeContent={item.badge}
+                                            badgeContent={showBadge}
                                             sx={{
                                                 '& .MuiBadge-badge': {
                                                     fontSize: '0.65rem',
                                                     height: 18,
                                                     minWidth: 18,
-                                                    background: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)',
+                                                    background: badgeColor,
                                                     color: '#fff'
                                                 }
                                             }}
@@ -648,7 +705,7 @@ const Layout = ({ children }) => {
                                     '&:hover': { bgcolor: colors.navyLighter }
                                 }}>
                                 <Badge
-                                    badgeContent={3}
+                                    badgeContent={unreadCount} showZero={false}
                                     sx={{
                                         '& .MuiBadge-badge': {
                                             background: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)',
@@ -708,40 +765,57 @@ const Layout = ({ children }) => {
                             }}>
                                 Notifications
                             </ListSubheader>
-                            {dummyNotifications.map((notif) => (
-                                <MenuItem key={notif.id} onClick={handleCloseNotifications} sx={{
+                            {notifications.length === 0 ? (
+                                <MenuItem disabled sx={{ py: 2, justifyContent: 'center' }}>
+                                    <Typography variant="body2" sx={{ color: colors.gray }}>No notifications</Typography>
+                                </MenuItem>
+                            ) : notifications.map((notif) => (
+                                <MenuItem key={notif.id} onClick={() => { handleCloseNotifications(); if (notif.link) navigate(notif.link); markReadMutation.mutate([notif.id]); }} sx={{
                                     py: 1.5,
                                     px: 2,
                                     gap: 1.5,
                                     borderBottom: `1px solid ${colors.navyLighter}`,
-                                    bgcolor: notif.unread ? colors.tealLighter : 'transparent',
+                                    bgcolor: !notif.is_read ? colors.tealLighter : 'transparent',
                                     '&:hover': {
                                         bgcolor: colors.grayLighter
                                     }
                                 }}>
                                     <Box sx={{
-                                        width: 8,
-                                        height: 8,
+                                        width: 32,
+                                        height: 32,
                                         borderRadius: '50%',
-                                        bgcolor: notif.unread ? colors.teal : 'transparent',
-                                        flexShrink: 0
-                                    }} />
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0,
+                                        color: !notif.is_read ? colors.teal : colors.gray,
+                                        bgcolor: !notif.is_read ? colors.tealLighter : colors.grayLighter
+                                    }}>
+                                        {getNotifIcon(notif.type)}
+                                    </Box>
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                         <Typography variant="body2" sx={{
                                             color: colors.navy,
-                                            fontWeight: notif.unread ? 600 : 400,
+                                            fontWeight: !notif.is_read ? 600 : 400,
                                             whiteSpace: 'normal',
                                             lineHeight: 1.4
                                         }}>
-                                            {notif.text}
+                                            {notif.message}
                                         </Typography>
                                         <Typography variant="caption" sx={{ color: colors.gray, display: 'block', mt: 0.5 }}>
-                                            {notif.time}
+                                            {timeAgo(notif.created_at)}
                                         </Typography>
                                     </Box>
                                 </MenuItem>
                             ))}
-                            <Box sx={{ p: 1 }}>
+                            <Box sx={{ p: 1, display: 'flex', gap: 1 }}>
+                                <Button fullWidth size="small" onClick={() => markReadMutation.mutate(null)} sx={{
+                                    color: colors.teal,
+                                    fontWeight: 600,
+                                    textTransform: 'none'
+                                }}>
+                                    Mark all read
+                                </Button>
                                 <Button fullWidth size="small" sx={{
                                     color: colors.teal,
                                     fontWeight: 600,
