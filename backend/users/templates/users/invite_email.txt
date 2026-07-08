@@ -1,11 +1,17 @@
 Welcome to CHQI Dashboard
 
+Hello{% if user.first_name %} {{ user.first_name }}{% else %} there{% endif %},
+
 You have been invited to join the CHQI Dashboard as a {{ user.role }}.
-Your login is: {{ login }}
+Your login username is: {{ login }}
 
 Set your password to activate your account:
 {{ reset_url }}
 
+After setting your password you can sign in at {{ site_url }}.
+
 This link expires in 3 days. If you did not expect this invitation, you can ignore this email.
+
+Questions? Email {{ support_email }}.
 
 — The CHQI Dashboard Team

@@ -49,6 +49,9 @@ class CustomUserAdmin(UserAdmin):
             'login': user.email or user.username,
             'reset_url': reset_url,
             'site_name': 'CHQI Dashboard',
+            'site_url': settings.FRONTEND_URL,
+            'logo_url': f"{settings.FRONTEND_URL}/assets/logo-white.png",
+            'support_email': 'support@chqi.org',
         }
 
         subject = 'Welcome to CHQI Dashboard — set your password'
