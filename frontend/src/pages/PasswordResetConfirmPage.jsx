@@ -61,9 +61,7 @@ const PasswordResetConfirmPage = () => {
     useEffect(() => {
         const verifyToken = async () => {
             try {
-                const res = await api.get('/users/password_reset_verify/', {
-                    params: { uid: uidb64, token }
-                });
+                const res = await api.get('/users/password_reset_verify/', { uid: uidb64, token });
                 setTokenValid(res.valid === true);
             } catch {
                 setTokenValid(false);

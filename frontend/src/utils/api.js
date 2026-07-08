@@ -84,9 +84,12 @@ const api = {
     setToken: (token) => {
         manualCsrfToken = token;
     },
-    get: (endpoint, params) => fetch(buildUrl(endpoint, params), {
-        credentials: 'include'
-    }).then(handleResponse),
+    get: (endpoint, arg) => {
+        const params = arg && arg.params ? arg.params : arg;
+        return fetch(buildUrl(endpoint, params), {
+            credentials: 'include'
+        }).then(handleResponse);
+    },
     post: (endpoint, data) => fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: getHeaders(),
