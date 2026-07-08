@@ -46,7 +46,7 @@ const float = keyframes`
 const PasswordResetConfirmPage = () => {
     const params = useParams();
     const uidb64 = params.uidb64;
-    const token = params['*']?.replace(/\/+$/, '').replace(/=+$/, '');
+    const token = params['*']?.replace(/\/+$/, '');
     const navigate = useNavigate();
 
     const [checking, setChecking] = useState(true);

@@ -70,11 +70,21 @@ const getMultipartHeaders = () => {
     return headers;
 };
 
+const buildUrl = (endpoint, params) => {
+    if (!params) return `${API_BASE_URL}${endpoint}`;
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) search.append(key, value);
+    });
+    const query = search.toString();
+    return query ? `${API_BASE_URL}${endpoint}?${query}` : `${API_BASE_URL}${endpoint}`;
+};
+
 const api = {
     setToken: (token) => {
         manualCsrfToken = token;
     },
-    get: (endpoint) => fetch(`${API_BASE_URL}${endpoint}`, {
+    get: (endpoint, params) => fetch(buildUrl(endpoint, params), {
         credentials: 'include'
     }).then(handleResponse),
     post: (endpoint, data) => fetch(`${API_BASE_URL}${endpoint}`, {
