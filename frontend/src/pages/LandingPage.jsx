@@ -512,8 +512,9 @@ const LandingPage = () => {
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                                         <TextField
                                             fullWidth
-                                            label="Username"
+                                            label="Email or username"
                                             variant="filled"
+                                            placeholder="you@chqi.org"
                                             value={username}
                                             onChange={(e) => setUsername(e.target.value)}
                                             InputProps={{
