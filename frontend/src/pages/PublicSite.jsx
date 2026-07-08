@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { colors } from '../theme/colors';
 import { institution, stats, mission, values, contact, navLinks } from '../data/siteContent';
 import api from '../utils/api';
+import { isLandingDomain, DASHBOARD_LOGIN_URL } from '../utils/site';
 
 // ─── Keyframes ────────────────────────────────────────────────────────────────
 const cssAnimations = `
@@ -1058,7 +1059,16 @@ const Footer = ({ onLoginClick }) => (
 // ─── Main PublicSite Component ─────────────────────────────────────────────────
 const PublicSite = () => {
     const navigate = useNavigate();
-    const handleLogin = () => navigate('/login');
+
+    // On the landing domain (chqi.org) the app lives elsewhere, so send users
+    // to the real login page on dashboards.chqi.org. Everywhere else, route internally.
+    const handleLogin = () => {
+        if (isLandingDomain()) {
+            window.location.href = DASHBOARD_LOGIN_URL;
+        } else {
+            navigate('/login');
+        }
+    };
 
     return (
         <>
