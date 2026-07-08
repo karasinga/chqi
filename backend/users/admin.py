@@ -50,7 +50,7 @@ class CustomUserAdmin(UserAdmin):
             'reset_url': reset_url,
             'site_name': 'CHQI Dashboard',
             'site_url': settings.FRONTEND_URL,
-            'logo_url': f"{settings.FRONTEND_URL}/assets/logo-white.png",
+            'logo_url': f"{settings.FRONTEND_URL}/assets/logo.png",
             'support_email': settings.DEFAULT_FROM_EMAIL,
         }
 
