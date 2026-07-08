@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import ProjectDetail from './pages/ProjectDetails';
 import PasswordResetConfirmPage from './pages/PasswordResetConfirmPage';
 import UserGuide from './pages/UserGuide';
+import Notifications from './pages/Notifications';
 import { isLandingDomain, DASHBOARD_BASE_URL } from './utils/site';
 
 const queryClient = new QueryClient();
@@ -136,6 +137,14 @@ const AppRoutes = () => {
                 }
             />
 
+            <Route
+                path="/notifications"
+                element={
+                    <ProtectedRoute>
+                        <Notifications />
+                    </ProtectedRoute>
+                }
+            />
             <Route
                 path="/guide"
                 element={

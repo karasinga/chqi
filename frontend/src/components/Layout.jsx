@@ -17,11 +17,6 @@ import {
     Search as SearchIcon,
     Notifications as NotificationsIcon,
     HelpOutline as HelpOutlineIcon,
-    PersonAdd as PersonAddIcon,
-    ChatBubbleOutline as ChatBubbleOutlineIcon,
-    SwapHoriz as SwapHorizIcon,
-    WarningAmber as WarningAmberIcon,
-    InfoOutlined as InfoOutlinedIcon,
 } from '@mui/icons-material';
 import { Link, useLocation } from 'react-router-dom';
 import { keyframes } from '@mui/system';
@@ -31,6 +26,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors } from '../theme/colors';
 import { useNavigate } from 'react-router-dom';
 import { timeAgo } from '../utils/time';
+import { notifIcon } from '../utils/notification';
 
 // Animations
 const pulse = keyframes`
@@ -152,17 +148,6 @@ const Layout = ({ children }) => {
             queryClient.invalidateQueries({ queryKey: ['unreadCount'] });
         },
     });
-
-    const getNotifIcon = (type) => {
-        switch (type) {
-            case 'assignment': return <PersonAddIcon fontSize="small" />;
-            case 'comment': return <ChatBubbleOutlineIcon fontSize="small" />;
-            case 'status': return <SwapHorizIcon fontSize="small" />;
-            case 'due_soon':
-            case 'overdue': return <WarningAmberIcon fontSize="small" />;
-            default: return <InfoOutlinedIcon fontSize="small" />;
-        }
-    };
 
     // ── My Tasks badge (open / overdue / due_soon) ─────────────────
     const { data: myTasksData } = useQuery({
@@ -791,7 +776,7 @@ const Layout = ({ children }) => {
                                         color: !notif.is_read ? colors.teal : colors.gray,
                                         bgcolor: !notif.is_read ? colors.tealLighter : colors.grayLighter
                                     }}>
-                                        {getNotifIcon(notif.type)}
+                                        {notifIcon(notif.type)}
                                     </Box>
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                         <Typography variant="body2" sx={{
@@ -816,7 +801,7 @@ const Layout = ({ children }) => {
                                 }}>
                                     Mark all read
                                 </Button>
-                                <Button fullWidth size="small" sx={{
+                                <Button fullWidth size="small" onClick={() => { handleCloseNotifications(); navigate('/notifications'); }} sx={{
                                     color: colors.teal,
                                     fontWeight: 600,
                                     textTransform: 'none'
