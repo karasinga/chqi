@@ -19,8 +19,13 @@ class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         (None, {'fields': ('role',)}),
     )
-    add_fieldsets = UserAdmin.add_fieldsets + (
-        (None, {'fields': ('role',)}),
+    # Include `email` so admins can invite users by email (the invite is only
+    # sent when an email address is provided). `role` is also collected here.
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'password1', 'password2', 'role'),
+        }),
     )
 
     def save_model(self, request, obj, form, change):

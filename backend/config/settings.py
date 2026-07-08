@@ -275,6 +275,14 @@ else:
     # Development — prints to terminal with a clear banner
     EMAIL_BACKEND = 'config.email_backend.NoWrapConsoleEmailBackend'
 
+# ─── Authentication ──────────────────────────────────────────────────────────
+# Allow users to log in with their username OR the email on their account.
+# The custom backend extends Django's default ModelBackend, so all existing
+# behavior (including the Django admin login) is preserved.
+AUTHENTICATION_BACKENDS = [
+    'users.backends.EmailOrUsernameBackend',
+]
+
 # Frontend URL — used in password reset links.
 # Dev:  http://localhost:5173  (React dev server)
 # Prod: set FRONTEND_URL=https://yourdomain.com as an env var
