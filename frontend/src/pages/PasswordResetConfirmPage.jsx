@@ -64,7 +64,7 @@ const PasswordResetConfirmPage = () => {
                 const res = await api.get('/users/password_reset_verify/', {
                     params: { uid: uidb64, token }
                 });
-                setTokenValid(res.data.valid === true);
+                setTokenValid(res.valid === true);
             } catch {
                 setTokenValid(false);
             } finally {
