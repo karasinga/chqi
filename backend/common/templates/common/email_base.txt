@@ -1,0 +1,6 @@
+{{ site_name }}
+
+{% block content %}{% endblock %}
+
+Questions? Email {{ support_email }}.
+— The {{ site_name }} Team

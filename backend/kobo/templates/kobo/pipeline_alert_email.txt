@@ -1,0 +1,6 @@
+{% extends "common/email_base.txt" %}
+{% block content %}
+{{ title }}
+
+{{ message }}
+{% endblock %}
