@@ -43,8 +43,15 @@ class TaskViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
         if old_assignee != task.assignee:
             target_name = f"{task.name} to {task.assignee.username if task.assignee else 'Unassigned'}"
             self.log_activity(task, 'assigned', target_name=target_name)
+            # Task was unassigned: remove the stale assignment notification for the old assignee.
+            if task.assignee is None and old_assignee is not None:
+                Notification.objects.filter(
+                    recipient=old_assignee,
+                    type='assignment',
+                    target_id=str(task.id),
+                ).delete()
             # Notify new assignee (skip if they reassigned to themselves)
-            if task.assignee and self.request.user.is_authenticated and task.assignee != self.request.user:
+            elif task.assignee and self.request.user.is_authenticated and task.assignee != self.request.user:
                 self._notify_assignment(task, self.request.user)
 
         if old_status != task.status:
