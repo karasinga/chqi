@@ -65,6 +65,18 @@ const ModernProjectCard = ({ project, onClick }) => {
     const completion = project.task_count > 0 ? Math.round(((project.status_counts?.completed || 0) / project.task_count) * 100) : 0;
     const daysLeft = project.end_date ? Math.ceil((new Date(project.end_date) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
 
+    // Schedule-based progress: how far today sits between start and end date.
+    const scheduleProgress = (() => {
+        if (!project.start_date || !project.end_date) return null;
+        const start = new Date(project.start_date).getTime();
+        const end = new Date(project.end_date).getTime();
+        if (end <= start) return null;
+        const pct = ((Date.now() - start) / (end - start)) * 100;
+        return Math.max(0, Math.min(100, Math.round(pct)));
+    })();
+    // Behind schedule if actual completion lags the elapsed calendar time.
+    const behind = scheduleProgress !== null && completion < scheduleProgress;
+
     return (
         <Card
             onClick={onClick}
@@ -89,13 +101,29 @@ const ModernProjectCard = ({ project, onClick }) => {
                     <IconButton size="small" sx={{ mr: -1, mt: -1 }}><MoreVertIcon fontSize="small" /></IconButton>
                 </Box>
                 <Box sx={{ mb: 3 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>Progress</Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>Tasks Done</Typography>
                         <Typography variant="caption" sx={{ fontWeight: 800 }}>{completion}%</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', bgcolor: 'rgba(0,0,0,0.05)' }}>
                         <Box sx={{ width: `${completion}%`, bgcolor: healthColor }} />
                     </Box>
+
+                    {scheduleProgress !== null && (
+                        <Box sx={{ mt: 1.5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                                    Schedule {behind ? '(behind)' : '(on track)'}
+                                </Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 800, color: behind ? 'error.main' : 'text.primary' }}>
+                                    {scheduleProgress}%
+                                </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', bgcolor: 'rgba(0,0,0,0.05)' }}>
+                                <Box sx={{ width: `${scheduleProgress}%`, bgcolor: behind ? '#ff1744' : '#2979ff' }} />
+                            </Box>
+                        </Box>
+                    )}
                 </Box>
                 <Box sx={{ p: 2, bgcolor: alpha(healthColor, 0.04), borderRadius: 3, border: `1px dashed ${alpha(healthColor, 0.2)}` }}>
                     <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: healthColor, mb: 1, textTransform: 'uppercase', fontSize: '0.65rem' }}>Next Critical Step</Typography>
