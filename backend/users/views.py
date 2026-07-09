@@ -83,10 +83,15 @@ class UserViewSet(viewsets.ModelViewSet):
 
                 form.save(
                     use_https=request.is_secure(),
-                    email_template_name='registration/password_reset_email.html',
+                    email_template_name='registration/password_reset_email.txt',
+                    html_email_template_name='registration/password_reset_email.html',
                     request=request,
                     extra_email_context={
                         'frontend_url': settings.FRONTEND_URL,
+                        'logo_url': f"{settings.FRONTEND_URL.rstrip('/')}/assets/logo.png",
+                        'site_url': settings.FRONTEND_URL,
+                        'support_email': settings.DEFAULT_FROM_EMAIL,
+                        'site_name': 'CHQI Dashboard',
                     },
                 )
                 return Response({'detail': 'Password reset email sent.'})

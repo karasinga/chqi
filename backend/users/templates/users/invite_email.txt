@@ -1,5 +1,5 @@
-Welcome to CHQI Dashboard
-
+{% extends "common/email_base.txt" %}
+{% block content %}
 Hello {{ user.username|title }},
 
 You have been invited to join the CHQI Dashboard as a {{ user.role }}.
@@ -11,7 +11,4 @@ Set your password to activate your account:
 After setting your password you can sign in at {{ site_url }}.
 
 This link expires in 3 days. If you did not expect this invitation, you can ignore this email.
-
-Questions? Email {{ support_email }}.
-
-— The CHQI Dashboard Team
+{% endblock %}

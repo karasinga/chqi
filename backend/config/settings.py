@@ -44,6 +44,7 @@ ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()] 
 
 INSTALLED_APPS = [
     'users',
+    'common',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

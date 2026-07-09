@@ -4,13 +4,10 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-import logging
+
+from common.email import send_templated_email
 
 from .models import User
-
-logger = logging.getLogger(__name__)
 
 
 @admin.register(User)
@@ -48,31 +45,15 @@ class CustomUserAdmin(UserAdmin):
             'user': user,
             'login': user.email or user.username,
             'reset_url': reset_url,
-            'site_name': 'CHQI Dashboard',
-            'site_url': settings.FRONTEND_URL,
-            'logo_url': f"{settings.FRONTEND_URL}/assets/logo.png",
-            'support_email': settings.DEFAULT_FROM_EMAIL,
         }
 
         subject = 'Welcome to CHQI Dashboard — set your password'
-        try:
-            text_body = render_to_string('users/invite_email.txt', context)
-            html_body = render_to_string('users/invite_email.html', context)
-        except Exception:
-            logger.exception('Failed to render invite email templates for %s', user.email)
-            return
-
-        email = EmailMultiAlternatives(
+        # Don't break user creation if mail rendering/delivery fails; the
+        # helper logs and returns False on error.
+        send_templated_email(
             subject,
-            text_body,
-            settings.DEFAULT_FROM_EMAIL,
-            [user.email],
+            user.email,
+            text_template='users/invite_email.txt',
+            html_template='users/invite_email.html',
+            context=context,
         )
-        email.attach_alternative(html_body, 'text/html')
-
-        try:
-            email.send()
-            logger.info('Invite email sent to %s', user.email)
-        except Exception:
-            # Don't break user creation if mail delivery fails; just log it.
-            logger.exception('Failed to send invite email to %s', user.email)

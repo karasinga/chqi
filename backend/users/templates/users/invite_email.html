@@ -1,60 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <title>Welcome to CHQI Dashboard</title>
-</head>
-<body style="margin:0; padding:0; background:#f4f6fb; font-family:Arial, Helvetica, sans-serif; color:#182f5b;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb; padding:24px 0;">
-        <tr>
-            <td align="center">
-                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 24px rgba(24,47,91,0.08);">
-                    <tr>
-                        <td style="background:#ffffff; padding:20px 32px; border-bottom:1px solid #eef0f5;">
-                            <img src="{{ logo_url }}" alt="CHQI Dashboard" height="40" style="display:block; height:40px; width:auto;" />
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:32px;">
-                            <h2 style="margin:0 0 16px; font-size:22px; color:#182f5b;">Welcome to CHQI Dashboard</h2>
-                            <p style="margin:0 0 16px; font-size:15px; line-height:1.6;">
-                                Hello {{ user.username|title }},
-                            </p>
-                            <p style="margin:0 0 16px; font-size:15px; line-height:1.6;">
-                                You have been invited to join the CHQI Dashboard as a
-                                <strong>{{ user.role }}</strong>.
-                            </p>
-                            <p style="margin:0 0 8px; font-size:15px; line-height:1.6;">
-                                Your login username is: <strong>{{ login }}</strong>
-                            </p>
-                            <p style="margin:0 0 24px; font-size:15px; line-height:1.6;">
-                                Set your password to activate your account:
-                            </p>
-                            <p style="margin:0 0 24px;">
-                                <a href="{{ reset_url }}"
-                                   style="display:inline-block; background:#00bcd4; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:8px; font-size:15px; font-weight:600;">
-                                    Set your password
-                                </a>
-                            </p>
-                            <p style="margin:0 0 8px; font-size:13px; line-height:1.6; color:#5a6b85;">
-                                After setting your password you can sign in at
-                                <a href="{{ site_url }}" style="color:#00bcd4; text-decoration:none; font-weight:600;">{{ site_url }}</a>.
-                            </p>
-                            <p style="margin:0 0 8px; font-size:13px; line-height:1.6; color:#5a6b85;">
-                                This link expires in 3 days. If you did not expect this invitation,
-                                you can safely ignore this email.
-                            </p>
-                            <p style="margin:24px 0 0; font-size:13px; line-height:1.6; color:#5a6b85;">
-                                Questions? Email <a href="mailto:{{ support_email }}" style="color:#00bcd4; text-decoration:none; font-weight:600;">{{ support_email }}</a>.
-                            </p>
-                            <p style="margin:8px 0 0; font-size:13px; line-height:1.6; color:#5a6b85;">
-                                — The CHQI Dashboard Team
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>
+{% extends "common/email_base.html" %}
+{% block content %}
+<h2 style="margin:0 0 16px; font-size:22px; color:#182f5b;">Welcome to CHQI Dashboard</h2>
+<p style="margin:0 0 16px; font-size:15px; line-height:1.6;">
+    Hello {{ user.username|title }},
+</p>
+<p style="margin:0 0 16px; font-size:15px; line-height:1.6;">
+    You have been invited to join the CHQI Dashboard as a
+    <strong>{{ user.role }}</strong>.
+</p>
+<p style="margin:0 0 8px; font-size:15px; line-height:1.6;">
+    Your login username is: <strong>{{ login }}</strong>
+</p>
+<p style="margin:0 0 24px; font-size:15px; line-height:1.6;">
+    Set your password to activate your account:
+</p>
+<p style="margin:0 0 24px;">
+    <a href="{{ reset_url }}"
+       style="display:inline-block; background:#00bcd4; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:8px; font-size:15px; font-weight:600;">
+        Set your password
+    </a>
+</p>
+<p style="margin:0 0 8px; font-size:13px; line-height:1.6; color:#5a6b85;">
+    After setting your password you can sign in at
+    <a href="{{ site_url }}" style="color:#00bcd4; text-decoration:none; font-weight:600;">{{ site_url }}</a>.
+</p>
+<p style="margin:0 0 8px; font-size:13px; line-height:1.6; color:#5a6b85;">
+    This link expires in 3 days. If you did not expect this invitation,
+    you can safely ignore this email.
+</p>
+{% endblock %}

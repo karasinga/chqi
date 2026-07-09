@@ -1,7 +1,7 @@
 import logging
 from django.core.management.base import BaseCommand
-from django.core.mail import mail_admins
 from django.utils import timezone
+from common.email import send_admin_email
 from kobo.services.sync_service import SyncService
 
 logger = logging.getLogger(__name__)
@@ -36,23 +36,33 @@ class Command(BaseCommand):
             
             # Alert on suspicious zero-record pull (weekdays only)
             if result['fetched'] == 0 and timezone.now().weekday() < 5:
-                mail_admins(
+                send_admin_email(
                     subject='⚠️ KMHCBP Pipeline: Zero records pulled',
-                    message=(
-                        f"The Kobo pull completed but fetched 0 records.\n"
-                        f"Check sync_log id={result['job_id']}."
-                    )
+                    text_template='kobo/pipeline_alert_email.txt',
+                    html_template='kobo/pipeline_alert_email.html',
+                    context={
+                        'title': '⚠️ KMHCBP Pipeline: Zero records pulled',
+                        'message': (
+                            f"The Kobo pull completed but fetched 0 records.\n"
+                            f"Check sync_log id={result['job_id']}."
+                        ),
+                    },
                 )
-                
+
             # Alert on field mapping drift
             if result.get('mapping_warnings'):
-                mail_admins(
+                send_admin_email(
                     subject='⚠️ KMHCBP Pipeline: Kobo field mapping drift detected',
-                    message=(
-                        "The Kobo form structure appears to have changed:\n\n"
-                        + "\n".join(result['mapping_warnings'])
-                        + "\n\nData saved in raw_payload, but extracted columns may be NULL."
-                    )
+                    text_template='kobo/pipeline_alert_email.txt',
+                    html_template='kobo/pipeline_alert_email.html',
+                    context={
+                        'title': '⚠️ KMHCBP Pipeline: Kobo field mapping drift detected',
+                        'message': (
+                            "The Kobo form structure appears to have changed:\n\n"
+                            + "\n".join(result['mapping_warnings'])
+                            + "\n\nData saved in raw_payload, but extracted columns may be NULL."
+                        ),
+                    },
                 )
             
             self.stdout.write(self.style.SUCCESS(
@@ -65,8 +75,13 @@ class Command(BaseCommand):
             
         except Exception as e:
             logger.exception("Kobo pull command failed")
-            mail_admins(
+            send_admin_email(
                 subject='🚨 KMHCBP Pipeline: Data pull FAILED',
-                message=f"Failed with error:\n\n{str(e)}"
+                text_template='kobo/pipeline_alert_email.txt',
+                html_template='kobo/pipeline_alert_email.html',
+                context={
+                    'title': '🚨 KMHCBP Pipeline: Data pull FAILED',
+                    'message': f"Failed with error:\n\n{str(e)}",
+                },
             )
             raise
