@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'budget',
     'researchers',
     'dmh_dashboard',
+    'public_dashboards',
     'kobo',
 ]
 
@@ -122,6 +123,12 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'public_dashboards': '60/min',
+    },
 }
 
 AUTH_USER_MODEL = 'users.User'
