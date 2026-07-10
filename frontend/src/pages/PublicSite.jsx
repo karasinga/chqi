@@ -6,6 +6,7 @@ import api from '../utils/api';
 import { isLandingDomain, DASHBOARD_LOGIN_URL } from '../utils/site';
 import PublicFooter from '../components/PublicFooter';
 import { PUBLIC_CSS } from '../components/publicStyles';
+import PublicNavLinks from '../components/PublicNavLinks';
 
 // ─── Keyframes ────────────────────────────────────────────────────────────────
 const cssAnimations = `
@@ -273,21 +274,10 @@ const Navbar = ({ onLoginClick, onNavLink }) => {
                 </div>
 
                 {/* Desktop Nav */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 32 }} className="desktop-nav">
-                    {navLinks.map(link => (
-                        <a key={link.label} href={link.href}
-                            className="pub-nav-link"
-                            onClick={(e) => { e.preventDefault(); onNavLink(link.href); }}>
-                            {link.label}
-                        </a>
-                    ))}
-                </div>
+                <PublicNavLinks onLoginClick={onLoginClick} onNavLink={onNavLink} />
 
-                {/* Login Button + Mobile Toggle */}
+                {/* Mobile Toggle (login lives in PublicNavLinks) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <button className="pub-btn-primary" onClick={onLoginClick} style={{ padding: '10px 22px', fontSize: '0.88rem' }}>
-                        Login to Dashboard
-                    </button>
                     <button
                         onClick={() => setMenuOpen(!menuOpen)}
                         aria-label={menuOpen ? 'Close menu' : 'Open menu'}

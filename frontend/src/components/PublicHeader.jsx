@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '../theme/colors';
-import { institution } from '../data/siteContent';
+import { institution, navLinks } from '../data/siteContent';
 import { isLandingDomain, DASHBOARD_LOGIN_URL } from '../utils/site';
 import { PUBLIC_CSS } from './publicStyles';
+import PublicNavLinks from './PublicNavLinks';
 
-// Public top bar that mimics the landing-page navbar (fixed, transparent →
-// solid on scroll, blurred, hover-underline links, pill login button) WITHOUT
-// repeating the CHQI wordmark. Keeps /dashboards from being a dead-end.
-// Self-contained: ships its own copy of the .pub-nav-link / .pub-btn-primary
-// styles so it works without PublicSite's global stylesheet.
+// Fixed public top bar for the /dashboards page. Reuses the same nav links as
+// the landing page (via PublicNavLinks) so the two public surfaces stay
+// consistent. Hash links jump back to the matching landing section.
 const PublicHeader = () => {
     const navigate = useNavigate();
     const [scrolled, setScrolled] = useState(false);
@@ -30,6 +29,17 @@ const PublicHeader = () => {
     const goHome = (e) => {
         e.preventDefault();
         navigate('/');
+    };
+
+    // In-page routes stay client-side; hash links leave for the landing page
+    // section (the dashboards page has no About/Team/etc. of its own).
+    const handleNavLink = (href) => {
+        if (href.startsWith('/')) {
+            if (href === '/dashboards') { window.scrollTo({ top: 0 }); return; }
+            navigate(href);
+        } else if (href.startsWith('#')) {
+            window.location.href = '/' + href;
+        }
     };
 
     return (
@@ -54,10 +64,7 @@ const PublicHeader = () => {
                     )}
                 </a>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 32 }} className='desktop-nav'>
-                    <a href='/' className='pub-nav-link' onClick={goHome}>Home</a>
-                    <button className='pub-btn-primary' onClick={handleLogin} style={{ padding: '10px 22px', fontSize: '0.88rem' }}>Staff Login</button>
-                </div>
+                <PublicNavLinks onLoginClick={handleLogin} onNavLink={handleNavLink} loginLabel="Staff Login" />
 
                 <button onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}
                     style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', color: '#fff', padding: 4 }} className='mobile-menu-btn'>
@@ -71,9 +78,13 @@ const PublicHeader = () => {
 
             {menuOpen && (
                 <div style={{ background: 'rgba(24,47,91,0.98)', backdropFilter: 'blur(20px)', padding: '16px 5% 24px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <a href='/' className='pub-nav-link' onClick={(e) => { e.preventDefault(); goHome(e); setMenuOpen(false); }} style={{ fontSize: '1rem' }}>Home</a>
-                    </div>
+                    {navLinks.map(link => (
+                        <div key={link.label} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <a href={link.href} className='pub-nav-link'
+                                onClick={(e) => { e.preventDefault(); handleNavLink(link.href); setMenuOpen(false); }}
+                                style={{ fontSize: '1rem' }}>{link.label}</a>
+                        </div>
+                    ))}
                     <div style={{ paddingTop: 16 }}>
                         <button className='pub-btn-primary' onClick={() => { handleLogin(); setMenuOpen(false); }} style={{ width: '100%', justifyContent: 'center', padding: '10px 20px', fontSize: '0.85rem' }}>Staff Login</button>
                     </div>
