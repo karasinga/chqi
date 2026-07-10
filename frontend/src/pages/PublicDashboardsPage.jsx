@@ -35,7 +35,7 @@ const PublicDashboardsPage = () => {
         {/* Branded header */}
         <section style={{
             background: `linear-gradient(135deg, ${colors.navy} 0%, #0d1f3c 40%, ${colors.navyLight} 100%)`,
-            padding: '120px 5% 72px',
+            padding: '96px 5% 56px',
             position: 'relative',
             overflow: 'hidden',
         }}>
@@ -68,7 +68,7 @@ const PublicDashboardsPage = () => {
                     Data &amp; Insights
                 </span>
                 <h1 style={{
-                    fontSize: 'clamp(2.2rem, 5vw, 3.4rem)',
+                    fontSize: 'clamp(1.8rem, 4vw, 2.6rem)',
                     fontWeight: 900, color: '#fff', letterSpacing: '-0.03em',
                     lineHeight: 1.1, marginBottom: 16,
                 }}>
