@@ -32,7 +32,7 @@ const PublicFooter = ({ onLoginClick, onNavLink }) => (
                         {institution.shortName}
                     </span>
                 </div>
-                <p style={{ color: '#666', fontSize: '0.875rem', lineHeight: 1.7 }}>
+                <p style={{ color: '#A8B0BD', fontSize: '0.875rem', lineHeight: 1.7 }}>
                     {institution.tagline}
                 </p>
             </div>
@@ -57,9 +57,9 @@ const PublicFooter = ({ onLoginClick, onNavLink }) => (
                     <h4 style={{ color: '#fff', fontWeight: 700, fontSize: '0.875rem', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         Contact
                     </h4>
-                    <p style={{ color: '#666', fontSize: '0.875rem', marginBottom: 8 }}>{contact.email}</p>
-                    <p style={{ color: '#666', fontSize: '0.875rem', marginBottom: 8 }}>{contact.phone}</p>
-                    <p style={{ color: '#666', fontSize: '0.875rem' }}>{contact.address}</p>
+                    <p style={{ color: '#A8B0BD', fontSize: '0.875rem', marginBottom: 8 }}>{contact.email}</p>
+                    <p style={{ color: '#A8B0BD', fontSize: '0.875rem', marginBottom: 8 }}>{contact.phone}</p>
+                    <p style={{ color: '#A8B0BD', fontSize: '0.875rem' }}>{contact.address}</p>
                     <button className="pub-btn-primary" onClick={onLoginClick}
                         style={{ marginTop: 20, padding: '10px 20px', fontSize: '0.85rem' }}>
                         Staff Login
@@ -73,10 +73,10 @@ const PublicFooter = ({ onLoginClick, onNavLink }) => (
             paddingTop: 24,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
         }}>
-            <p style={{ color: '#555', fontSize: '0.8rem' }}>
+            <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem' }}>
                 © {new Date().getFullYear()} {institution.name}. All rights reserved.
             </p>
-            <p style={{ color: '#444', fontSize: '0.8rem' }}>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem' }}>
                 Designed for research excellence.
             </p>
         </div>

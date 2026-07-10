@@ -24,7 +24,15 @@ const EmptyIcon = ({ size = 48, color = colors.gray }) => (
     </svg>
 );
 
-// Single embedded PowerBI report card
+const SearchIcon = ({ size = 18, color = colors.gray }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="7" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+);
+
+// Single embedded PowerBI report card.
 const DashboardCard = ({ dashboard }) => (
     <div style={{
         background: '#fff',
@@ -92,13 +100,14 @@ const DashboardCard = ({ dashboard }) => (
     </div>
 );
 
-// Public dashboards grid (fetched, grouped by division).
+// Public dashboards grid (fetched, grouped by division, searchable).
 // Reusable block rendered inside the dedicated /dashboards page.
 const PublicDashboardsGrid = () => {
     const [dashboards, setDashboards] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [active, setActive] = useState('All');
+    const [query, setQuery] = useState('');
 
     useEffect(() => {
         let cancelled = false;
@@ -121,16 +130,24 @@ const PublicDashboardsGrid = () => {
         return () => { cancelled = true; };
     }, []);
 
-    // Group visible dashboards by division (blank division -> "General").
+    // Apply the text query, then group by division (blank division -> "General").
     const groups = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        const filtered = q
+            ? dashboards.filter(d =>
+                (d.title || '').toLowerCase().includes(q) ||
+                (d.description || '').toLowerCase().includes(q) ||
+                (d.division || '').toLowerCase().includes(q))
+            : dashboards;
+
         const map = new Map();
-        dashboards.forEach(d => {
+        filtered.forEach(d => {
             const key = d.division?.trim() || 'General';
             if (!map.has(key)) map.set(key, []);
             map.get(key).push(d);
         });
         return Array.from(map.entries());
-    }, [dashboards]);
+    }, [dashboards, query]);
 
     // Division filter options (only meaningful when more than one division).
     const divisions = useMemo(() => ['All', ...groups.map(([d]) => d)], [groups]);
@@ -175,76 +192,112 @@ const PublicDashboardsGrid = () => {
 
     return shell(
         <div>
-            {groups.length > 1 && (
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 36 }}>
-                    {divisions.map(div => {
-                        const isActive = div === active;
-                        return (
-                            <button
-                                key={div}
-                                onClick={() => setActive(div)}
-                                style={{
-                                    cursor: 'pointer',
-                                    border: `1px solid ${isActive ? colors.teal : colors.navyLighter}`,
-                                    background: isActive ? colors.teal : '#fff',
-                                    color: isActive ? '#fff' : colors.navy,
-                                    borderRadius: 100,
-                                    padding: '9px 20px',
-                                    fontSize: '0.85rem',
-                                    fontWeight: 600,
-                                    transition: 'all 0.2s ease',
-                                    boxShadow: isActive ? `0 4px 14px ${colors.teal}40` : 'none',
-                                }}
-                            >
-                                {div}
-                            </button>
-                        );
-                    })}
+            {/* Search */}
+            {dashboards.length > 0 && (
+                <div style={{
+                    position: 'relative', maxWidth: 420, marginBottom: groups.length > 0 ? 28 : 0,
+                }}>
+                    <span style={{
+                        position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
+                        display: 'inline-flex', pointerEvents: 'none',
+                    }}>
+                        <SearchIcon />
+                    </span>
+                    <input
+                        type="search"
+                        value={query}
+                        onChange={e => { setQuery(e.target.value); setActive('All'); }}
+                        placeholder="Search dashboards…"
+                        aria-label="Search dashboards"
+                        style={{
+                            width: '100%', boxSizing: 'border-box',
+                            padding: '13px 16px 13px 44px',
+                            borderRadius: 100, border: `1px solid ${colors.navyLighter}`,
+                            background: '#fff', fontSize: '0.92rem', color: colors.navy,
+                            outline: 'none',
+                        }}
+                    />
                 </div>
             )}
 
-            {visible.map(([division, items]) => (
-                <div key={division} style={{ marginBottom: 56 }}>
-                    <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        marginBottom: 22, gap: 16, flexWrap: 'wrap',
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                            <span style={{
-                                width: 42, height: 42, borderRadius: 12,
-                                background: `${colors.teal}14`,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                color: colors.teal,
-                            }}>
-                                <ChartIcon />
-                            </span>
-                            <h3 style={{
-                                color: colors.navy, fontWeight: 800, fontSize: '1.25rem',
-                                margin: 0, letterSpacing: '-0.01em',
-                            }}>
-                                {division}
-                            </h3>
-                        </div>
-                        <span style={{
-                            background: '#fff', color: colors.gray,
-                            border: `1px solid ${colors.navyLighter}`,
-                            borderRadius: 100, padding: '5px 14px',
-                            fontSize: '0.78rem', fontWeight: 600,
-                        }}>
-                            {items.length} {items.length === 1 ? 'report' : 'reports'}
-                        </span>
-                    </div>
-                    <div className="pub-dash-grid" style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-                        gap: 28,
-                    }}>
-                        {items.map(d => (
-                            <DashboardCard key={d.id} dashboard={d} />
-                        ))}
-                    </div>
+            {visible.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#999', padding: '40px 0', fontSize: '0.95rem' }}>
+                    No dashboards match “{query}”.
                 </div>
-            ))}
+            ) : (
+                <>
+                    {groups.length > 1 && (
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 36, marginTop: 8 }}>
+                            {divisions.map(div => {
+                                const isActive = div === active;
+                                return (
+                                    <button
+                                        key={div}
+                                        onClick={() => setActive(div)}
+                                        style={{
+                                            cursor: 'pointer',
+                                            border: `1px solid ${isActive ? colors.teal : colors.navyLighter}`,
+                                            background: isActive ? colors.teal : '#fff',
+                                            color: isActive ? '#fff' : colors.navy,
+                                            borderRadius: 100,
+                                            padding: '9px 20px',
+                                            fontSize: '0.85rem',
+                                            fontWeight: 600,
+                                            transition: 'all 0.2s ease',
+                                            boxShadow: isActive ? `0 4px 14px ${colors.teal}40` : 'none',
+                                        }}
+                                    >
+                                        {div}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {visible.map(([division, items]) => (
+                        <div key={division} style={{ marginBottom: 56 }}>
+                            <div style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                marginBottom: 22, gap: 16, flexWrap: 'wrap',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                                    <span style={{
+                                        width: 42, height: 42, borderRadius: 12,
+                                        background: `${colors.teal}14`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        color: colors.teal,
+                                    }}>
+                                        <ChartIcon />
+                                    </span>
+                                    <h3 style={{
+                                        color: colors.navy, fontWeight: 800, fontSize: '1.25rem',
+                                        margin: 0, letterSpacing: '-0.01em',
+                                    }}>
+                                        {division}
+                                    </h3>
+                                </div>
+                                <span style={{
+                                    background: '#fff', color: colors.gray,
+                                    border: `1px solid ${colors.navyLighter}`,
+                                    borderRadius: 100, padding: '5px 14px',
+                                    fontSize: '0.78rem', fontWeight: 600,
+                                }}>
+                                    {items.length} {items.length === 1 ? 'report' : 'reports'}
+                                </span>
+                            </div>
+                            <div className="pub-dash-grid" style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+                                gap: 28,
+                            }}>
+                                {items.map(d => (
+                                    <DashboardCard key={d.id} dashboard={d} />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </>
+            )}
             <style>{`
                 @media (max-width: 520px) {
                     .pub-dash-grid { grid-template-columns: 1fr !important; }
