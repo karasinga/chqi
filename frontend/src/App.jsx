@@ -6,6 +6,7 @@ import LoadingScreen from './components/LoadingScreen';
 import Layout from './components/Layout';
 import LandingPage from './pages/LandingPage';
 import PublicSite from './pages/PublicSite';
+import PublicDashboardsPage from './pages/PublicDashboardsPage';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/TaskManagement';
 import Portfolio from './pages/PortfolioDashboard';
@@ -97,6 +98,12 @@ const AppRoutes = () => {
                         <PasswordResetConfirmPage />
                     )
                 }
+            />
+
+            {/* Public dashboard portal (no login required) */}
+            <Route
+                path="/dashboards"
+                element={<PublicDashboardsPage />}
             />
 
             {/* Protected Routes */}

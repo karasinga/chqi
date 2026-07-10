@@ -4,6 +4,8 @@ import { colors } from '../theme/colors';
 import { institution, stats, mission, values, contact, navLinks } from '../data/siteContent';
 import api from '../utils/api';
 import { isLandingDomain, DASHBOARD_LOGIN_URL } from '../utils/site';
+import PublicFooter from '../components/PublicFooter';
+import { PUBLIC_CSS } from '../components/publicStyles';
 
 // ─── Keyframes ────────────────────────────────────────────────────────────────
 const cssAnimations = `
@@ -50,26 +52,6 @@ body { font-family: 'Inter', sans-serif; }
 
 .pub-stat-card { animation: countUp 0.6s ease both; }
 
-.pub-nav-link {
-  position: relative;
-  color: rgba(255,255,255,0.75);
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.9rem;
-  transition: color 0.2s;
-  padding: 4px 0;
-}
-.pub-nav-link::after {
-  content: '';
-  position: absolute;
-  bottom: -2px; left: 0;
-  width: 0; height: 2px;
-  background: ${colors.teal};
-  transition: width 0.3s ease;
-}
-.pub-nav-link:hover { color: #fff; }
-.pub-nav-link:hover::after { width: 100%; }
-
 .pub-researcher-card {
   background: #fff;
   border-radius: 20px;
@@ -95,50 +77,6 @@ body { font-family: 'Inter', sans-serif; }
   background: rgba(255,255,255,0.1);
   border-color: ${colors.teal}60;
   transform: translateY(-4px);
-}
-
-.pub-btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: ${colors.teal};
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  padding: 14px 28px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.25s ease;
-  box-shadow: 0 4px 20px ${colors.teal}55;
-  font-family: 'Inter', sans-serif;
-}
-.pub-btn-primary:hover {
-  background: ${colors.tealDark};
-  transform: translateY(-2px);
-  box-shadow: 0 8px 28px ${colors.teal}70;
-}
-.pub-btn-outline {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  color: #fff;
-  border: 2px solid rgba(255,255,255,0.35);
-  border-radius: 12px;
-  padding: 13px 28px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.25s ease;
-  font-family: 'Inter', sans-serif;
-}
-.pub-btn-outline:hover {
-  border-color: #fff;
-  background: rgba(255,255,255,0.1);
-  transform: translateY(-2px);
 }
 
 .section-label {
@@ -238,8 +176,47 @@ const Icon = ({ name, size = 24, color = 'currentColor', style = {} }) => {
     );
 };
 
+// ─── Dashboards Teaser (landing link to /dashboards) ───────────────────────────
+const DashboardsTeaser = ({ onExplore }) => (
+    <section style={{ padding: '100px 5%', background: '#fff' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+            <div style={{
+                background: `linear-gradient(135deg, ${colors.navy} 0%, ${colors.navyLight} 100%)`,
+                borderRadius: 28, padding: '56px 48px',
+                display: 'flex', flexDirection: 'column', gap: 28,
+                alignItems: 'flex-start', justifyContent: 'space-between',
+                position: 'relative', overflow: 'hidden',
+            }}>
+                <div style={{
+                    position: 'absolute', top: -60, right: -60,
+                    width: 220, height: 220, borderRadius: '50%',
+                    background: `radial-gradient(circle, ${colors.teal}30 0%, transparent 70%)`,
+                }} />
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                    <span className="section-label">Data &amp; Insights</span>
+                    <h2 style={{
+                        fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 800, color: '#fff',
+                        letterSpacing: '-0.02em', marginTop: 8, marginBottom: 12,
+                    }}>
+                        Explore our interactive dashboards
+                    </h2>
+                    <p style={{
+                        color: colors.grayLight, lineHeight: 1.7, fontSize: '1rem', maxWidth: 520,
+                    }}>
+                        Open PowerBI reports on mental health, service coverage, and more — no login required.
+                    </p>
+                </div>
+                <button className="pub-btn-primary" onClick={onExplore}
+                    style={{ position: 'relative', zIndex: 1, whiteSpace: 'nowrap' }}>
+                    Explore Dashboards <Icon name="arrow_right" />
+                </button>
+            </div>
+        </div>
+    </section>
+);
+
 // ─── Navbar ────────────────────────────────────────────────────────────────────
-const Navbar = ({ onLoginClick }) => {
+const Navbar = ({ onLoginClick, onNavLink }) => {
     const [scrolled, setScrolled] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [logoError, setLogoError] = useState(false);
@@ -249,12 +226,6 @@ const Navbar = ({ onLoginClick }) => {
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
-
-    const handleNavClick = (href) => {
-        setMenuOpen(false);
-        const el = document.querySelector(href);
-        if (el) el.scrollIntoView({ behavior: 'smooth' });
-    };
 
     return (
         <nav style={{
@@ -271,7 +242,13 @@ const Navbar = ({ onLoginClick }) => {
                 height: 72,
             }}>
                 {/* Logo — uses state-based fallback instead of DOM manipulation */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onNavLink('/')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onNavLink('/'); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                >
                     {!logoError ? (
                         <img
                             src={institution.logoPath}
@@ -300,7 +277,7 @@ const Navbar = ({ onLoginClick }) => {
                     {navLinks.map(link => (
                         <a key={link.label} href={link.href}
                             className="pub-nav-link"
-                            onClick={(e) => { e.preventDefault(); handleNavClick(link.href); }}>
+                            onClick={(e) => { e.preventDefault(); onNavLink(link.href); }}>
                             {link.label}
                         </a>
                     ))}
@@ -337,7 +314,7 @@ const Navbar = ({ onLoginClick }) => {
                         <div key={link.label} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             <a href={link.href}
                                 className="pub-nav-link"
-                                onClick={(e) => { e.preventDefault(); handleNavClick(link.href); }}
+                                onClick={(e) => { e.preventDefault(); onNavLink(link.href); }}
                                 style={{ fontSize: '1rem' }}>
                                 {link.label}
                             </a>
@@ -978,84 +955,6 @@ const ContactSection = ({ onLoginClick }) => (
     </section>
 );
 
-// ─── Footer ────────────────────────────────────────────────────────────────────
-const Footer = ({ onLoginClick }) => (
-    <footer style={{
-        background: '#0a1628',
-        padding: '48px 5% 28px',
-        borderTop: `3px solid ${colors.teal}40`,
-    }}>
-        <div style={{
-            maxWidth: 1100, margin: '0 auto',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-            gap: 32, flexWrap: 'wrap', marginBottom: 40,
-        }}>
-            <div style={{ maxWidth: 320 }}>
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
-                }}>
-                    <div style={{
-                        width: 36, height: 36, background: colors.teal,
-                        borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontWeight: 900, color: '#fff', fontSize: '0.85rem',
-                    }}>
-                        {institution.shortName.slice(0, 2)}
-                    </div>
-                    <span style={{ color: '#fff', fontWeight: 800, fontSize: '1rem' }}>
-                        {institution.shortName}
-                    </span>
-                </div>
-                <p style={{ color: '#666', fontSize: '0.875rem', lineHeight: 1.7 }}>
-                    {institution.tagline}
-                </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: 48, flexWrap: 'wrap' }}>
-                <div>
-                    <h4 style={{ color: '#fff', fontWeight: 700, fontSize: '0.875rem', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Navigate
-                    </h4>
-                    {navLinks.map(link => (
-                        <div key={link.label} style={{ marginBottom: 10 }}>
-                            <a href={link.href}
-                                className="pub-nav-link"
-                                onClick={(e) => { e.preventDefault(); document.querySelector(link.href)?.scrollIntoView({ behavior: 'smooth' }); }}
-                                style={{ fontSize: '0.875rem' }}>
-                                {link.label}
-                            </a>
-                        </div>
-                    ))}
-                </div>
-                <div>
-                    <h4 style={{ color: '#fff', fontWeight: 700, fontSize: '0.875rem', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Contact
-                    </h4>
-                    <p style={{ color: '#666', fontSize: '0.875rem', marginBottom: 8 }}>{contact.email}</p>
-                    <p style={{ color: '#666', fontSize: '0.875rem', marginBottom: 8 }}>{contact.phone}</p>
-                    <p style={{ color: '#666', fontSize: '0.875rem' }}>{contact.address}</p>
-                    <button className="pub-btn-primary" onClick={onLoginClick}
-                        style={{ marginTop: 20, padding: '10px 20px', fontSize: '0.85rem' }}>
-                        Staff Login
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div style={{
-            borderTop: '1px solid #1a2a42',
-            paddingTop: 24,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
-        }}>
-            <p style={{ color: '#555', fontSize: '0.8rem' }}>
-                © {new Date().getFullYear()} {institution.name}. All rights reserved.
-            </p>
-            <p style={{ color: '#444', fontSize: '0.8rem' }}>
-                Designed for research excellence.
-            </p>
-        </div>
-    </footer>
-);
-
 // ─── Main PublicSite Component ─────────────────────────────────────────────────
 const PublicSite = () => {
     const navigate = useNavigate();
@@ -1070,18 +969,29 @@ const PublicSite = () => {
         }
     };
 
+    // Nav links are either in-page anchors (#about) or app routes (/dashboards).
+    const handleNavLink = (href) => {
+        if (href.startsWith('/')) {
+            navigate(href);
+            window.scrollTo({ top: 0 });
+        } else if (href.startsWith('#')) {
+            document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
     return (
         <>
-            <style>{cssAnimations}</style>
+            <style>{cssAnimations}{PUBLIC_CSS}</style>
             <div style={{ fontFamily: "'Inter', sans-serif" }}>
-                <Navbar onLoginClick={handleLogin} />
+                <Navbar onLoginClick={handleLogin} onNavLink={handleNavLink} />
                 <HeroSection onLoginClick={handleLogin} />
                 <StatsSection />
                 <AboutSection />
                 <ValuesSection />
                 <TeamSection />
+                <DashboardsTeaser onExplore={() => navigate('/dashboards')} />
                 <ContactSection onLoginClick={handleLogin} />
-                <Footer onLoginClick={handleLogin} />
+                <PublicFooter onLoginClick={handleLogin} onNavLink={handleNavLink} />
             </div>
         </>
     );

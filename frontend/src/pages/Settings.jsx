@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import { colors } from '../theme/colors';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import PowerBIDashboardManagementPanel from '../components/PowerBIDashboardManager';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -461,12 +462,15 @@ const Settings = () => {
                 }}
             >
                 <Tab label="Research Team" />
+                <Tab label="Public Dashboards" />
                 <Tab label="General" />
             </Tabs>
 
             {tab === 0 && <ResearcherManagementPanel />}
 
-            {tab === 1 && (
+            {tab === 1 && <PowerBIDashboardManagementPanel />}
+
+            {tab === 2 && (
                 <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: `1px solid ${colors.navyLighter}` }}>
                     <Typography sx={{ color: colors.gray }}>
                         General settings coming soon.

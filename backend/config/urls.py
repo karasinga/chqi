@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/budget/', include('budget.urls')),
     path('api/', include('projects.urls')),
     path('api/researchers/', include('researchers.urls')),
+    path('api/public-dashboards/', include('public_dashboards.urls')),
 ]
 
 if settings.DEBUG:
