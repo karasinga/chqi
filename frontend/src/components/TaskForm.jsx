@@ -205,6 +205,37 @@ function suggestWbsCode(parentTaskId, projectId, allTasks, excludeTaskId = null)
     return parentWbs ? `${parentWbs}.${maxIdx + 1}` : String(maxIdx + 1);
 }
 
+// ─── Previous sibling lookup ───────────────────────────────────────
+/**
+ * Find the id of the sibling immediately preceding a new task, so we can
+ * auto-seed an FS dependency (WBS order → schedule order).
+ *
+ * @param {string|number|null} parentTaskId  - Parent task id (null = top-level)
+ * @param {string|number}      projectId     - Current project id
+ * @param {Array}              allTasks      - Full task list (any project; filtered inside)
+ * @param {number|null}        excludeTaskId - Task being created/edited (excluded)
+ * @returns {number|null}  predecessor sibling id, or null if none
+ */
+function previousSiblingId(parentTaskId, projectId, allTasks, excludeTaskId = null) {
+    const projectTasks = allTasks.filter(
+        t => (t.project === projectId) && t.id !== excludeTaskId
+    );
+
+    const siblings = projectTasks.filter(
+        t => (t.parent_task || null) === (parentTaskId || null)
+    );
+
+    if (siblings.length === 0) return null;
+
+    siblings.sort((a, b) =>
+        (a.sort_order - b.sort_order) ||
+        (a.wbs_code || '').localeCompare(b.wbs_code || '', undefined, { numeric: true, sensitivity: 'base' }) ||
+        a.name.localeCompare(b.name)
+    );
+
+    return siblings[siblings.length - 1].id;
+}
+
 // ─── Build flatten tree for dropdowns ──────────────────────────────
 function buildTreeFlat(tasks) {
     const map = {};
@@ -244,7 +275,7 @@ function buildTreeFlat(tasks) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────
-const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], defaultProjectId = null, viewMode = false }) => {
+const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], defaultProjectId = null, viewMode = false, savePending = false }) => {
     const queryClient = useQueryClient();
 
     const blankForm = {
@@ -272,6 +303,8 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
     const [validation, setValidation] = useState(null); // {errors, warnings}
     // Track whether the user has manually typed a WBS code (overrides auto-suggestion)
     const [wbsUserEdited, setWbsUserEdited] = useState(false);
+    // Optional "Target Start" date (UI convenience over start_no_earlier_than)
+    const [targetStart, setTargetStart] = useState('');
 
     // ── Data queries ────────────────────────────────────────────
     const { data: users = [] } = useQuery({
@@ -333,12 +366,19 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
                 assignee: task.assignee || '',
                 notes: task.notes || '',
             });
+            // Show the pinned date in the Target Start field when present
+            setTargetStart(
+                task.constraint_type === 'start_no_earlier_than' && task.constraint_date
+                    ? task.constraint_date
+                    : ''
+            );
             // Show any validation warnings from task data
             if (task._validation) setValidation(task._validation);
         } else {
             setFormData({ ...blankForm, project: defaultProjectId || '' });
             setValidation(null);
             setWbsUserEdited(false); // fresh form → allow auto-suggestion
+            setTargetStart(''); // fresh form → no pinned start
         }
     }, [task, open, defaultProjectId]);
 
@@ -361,14 +401,14 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
     // ── Handlers ────────────────────────────────────────────────
     const handleChange = (e) => {
         const { name, value } = e.target;
+        // When parent_task changes, reset the user-edited flag so auto-suggestion fires
+        if (name === 'parent_task') setWbsUserEdited(false);
         setFormData(prev => {
             const updates = { [name]: value };
             // Milestones always have duration 0
             if (name === 'task_type' && value === 'milestone') updates.duration = 0;
-            // Summary tasks don't need a user-set duration
-            if (name === 'project') updates.task_dependencies = [];
-            // When parent_task changes, reset the user-edited flag so auto-suggestion fires
-            if (name === 'parent_task') setWbsUserEdited(false);
+            // Switching project clears dependencies — but only when the project actually changed
+            if (name === 'project' && value !== prev.project) updates.task_dependencies = [];
             return { ...prev, ...updates };
         });
     };
@@ -404,10 +444,35 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
     }));
 
     const handleSubmit = () => {
+        if (savePending) return; // block double-submit while a save is in flight
         // Build clean payload
-        const cleanDeps = formData.task_dependencies
+        let cleanDeps = formData.task_dependencies
             .filter(d => d.predecessor_id)
             .map(d => ({ predecessor_id: d.predecessor_id, type: d.type || 'FS', lag: Number(d.lag || 0) }));
+
+        // ── A: auto-seed an FS dependency from the previous sibling on create ──
+        // Makes WBS order become the schedule by default. Only when creating and
+        // the user hasn't already specified dependencies. Same parent group only.
+        if (!task && cleanDeps.length === 0) {
+            const prev = previousSiblingId(
+                formData.parent_task || null,
+                formData.project,
+                allTasks,
+                task?.id ?? null
+            );
+            if (prev) {
+                cleanDeps = [{ predecessor_id: prev, type: 'FS', lag: 0 }];
+            }
+        }
+
+        // ── B: Target Start convenience → start_no_earlier_than constraint ──
+        // The Target Start field is the single source of truth: a date implies an
+        // SNET constraint; cleared/empty restores ASAP. It overrides any value
+        // carried in formData.constraint_* so the field is always editable.
+        const constraintType = targetStart
+            ? 'start_no_earlier_than'
+            : 'as_soon_as_possible';
+        const constraintDate = targetStart || null;
 
         const cleanData = {
             name: formData.name,
@@ -422,8 +487,8 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
             dependencies: cleanDeps.map(d => d.predecessor_id),
             status: formData.status,
             priority: formData.priority,
-            constraint_type: formData.constraint_type || 'as_soon_as_possible',
-            constraint_date: formData.constraint_date || null,
+            constraint_type: constraintType,
+            constraint_date: constraintDate,
             assignee: formData.assignee ? Number(formData.assignee) : null,
             description: formData.description || '',
             notes: formData.notes || '',
@@ -471,7 +536,11 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
             <Divider />
 
             <DialogContent sx={{ mt: 1.5 }}>
-                <Stack spacing={2.5}>
+                <Stack
+                    component="form"
+                    onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
+                    spacing={2.5}
+                >
 
                     {/* ── Validation feedback ─────────────────── */}
                     {validation?.errors?.length > 0 && (
@@ -675,6 +744,25 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
                         </Grid>
                     </Grid>
 
+                    {/* ── Target Start (optional) ─────────────── */}
+                    <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                            <TextField
+                                size="small"
+                                name="targetStart"
+                                label="Target Start (optional)"
+                                type="date"
+                                fullWidth
+                                value={targetStart || ''}
+                                onChange={(e) => setTargetStart(e.target.value || '')}
+                                disabled={viewMode}
+                                InputLabelProps={{ shrink: true }}
+                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                                helperText="Pins earliest start; order still drives the schedule."
+                            />
+                        </Grid>
+                    </Grid>
+
                     {/* ── Duration + Status + Priority ─────────── */}
                     <Grid container spacing={2}>
                         <Grid item xs={4}>
@@ -805,6 +893,11 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
                         </AccordionSummary>
                         <AccordionDetails>
                             <Stack spacing={2}>
+                                {targetStart ? (
+                                    <Typography variant="caption" color="text.secondary">
+                                        Target Start is set above — it controls this task's scheduling constraint. Clear Target Start to use custom constraints below.
+                                    </Typography>
+                                ) : (
                                 <Grid container spacing={2}>
                                     <Grid item xs={12} sm={6}>
                                         <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}>
@@ -842,6 +935,7 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
                                         />
                                     </Grid>
                                 </Grid>
+                                )}
                                 <TextField
                                     name="notes"
                                     label="Notes"
@@ -916,10 +1010,10 @@ const TaskForm = ({ open, onClose, onSave, task, allTasks = [], projects = [], d
                     <Button
                         onClick={handleSubmit}
                         variant="contained"
-                        disabled={!formData.name || !formData.project}
+                        disabled={!formData.name || !formData.project || savePending}
                         sx={{ borderRadius: 3, px: 4, fontWeight: 800, bgcolor: tok.accent, '&:hover': { bgcolor: '#148a86' } }}
                     >
-                        {task ? 'Save Changes' : 'Create Task'}
+                        {savePending ? 'Saving…' : (task ? 'Save Changes' : 'Create Task')}
                     </Button>
                 )}
             </DialogActions>

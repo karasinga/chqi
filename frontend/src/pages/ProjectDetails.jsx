@@ -1766,6 +1766,7 @@ const ProjectDetails = () => {
                 allTasks={rawTasks}
                 projects={[{ id: project.id, name: project.name }]}
                 defaultProjectId={project.id}
+                savePending={saveTaskMutation.isPending}
             />
             <DeleteConfirmationModal
                 open={deleteModalOpen}
