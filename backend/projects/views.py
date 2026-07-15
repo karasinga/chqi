@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from .models import Project, ProjectFile, FileFolder, Milestone
 from .serializers import ProjectSerializer, ProjectFileSerializer, FileFolderSerializer, MilestoneSerializer
@@ -15,6 +16,14 @@ class ProjectViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
         self.log_activity(project, 'create')
 
     def perform_update(self, serializer):
+        # Only the project creator (or staff) may change the approved budget.
+        if 'total_budget' in serializer.validated_data:
+            project = serializer.instance
+            user = self.request.user
+            if not user.is_staff and project.created_by_id != user.id:
+                raise PermissionDenied(
+                    "Only the project owner can change the total budget."
+                )
         project = serializer.save()
         self.log_activity(project, 'update')
 

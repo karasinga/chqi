@@ -120,6 +120,10 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
             setTempBudget(0);
         },
         onError: (error) => {
+            if (error.response?.status === 403) {
+                alert('Error: Only the project owner can change the total budget.');
+                return;
+            }
             const errorMsg = error.response?.data?.total_budget?.[0]
                 || error.response?.data?.detail
                 || error.message
@@ -131,15 +135,12 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
     const addExpenseMutation = useMutation({
         mutationFn: (data) => api.post('/budget/expenses/', { ...data, project: projectId, category: data.category }),
         onSuccess: async () => {
-            console.log('Expense added successfully, refreshing data...');
             // Invalidate with the same key used for fetching
             await queryClient.invalidateQueries({ queryKey: ['expenses', projectId] });
             await queryClient.refetchQueries({ queryKey: ['expenses', projectId] });
 
-            // Force a slight delay to ensure the backend DB has settled
-            setTimeout(() => {
-                queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-            }, 500);
+            await queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+            await queryClient.refetchQueries({ queryKey: ['project', projectId] });
 
             setOpenExpenseDialog(false);
             setFormData({
@@ -190,7 +191,6 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
     const deleteExpenseMutation = useMutation({
         mutationFn: (id) => api.delete(`/budget/expenses/${id}/`),
         onSuccess: async () => {
-            console.log('Expense deleted successfully, refreshing...');
             // Wait for data to refresh
             await queryClient.invalidateQueries({ queryKey: ['expenses', projectId] });
             await queryClient.refetchQueries({ queryKey: ['expenses', projectId] });
@@ -217,7 +217,6 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
             return api.post('/budget/categories/', { name: trimmedName, project: projectId });
         },
         onSuccess: async () => {
-            console.log('Category added successfully, refreshing...');
             await queryClient.invalidateQueries({ queryKey: ['budget-categories', projectId] });
             await queryClient.refetchQueries({ queryKey: ['budget-categories', projectId] });
             setNewCategoryName('');
@@ -274,7 +273,6 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
     const deleteCategoryMutation = useMutation({
         mutationFn: (id) => api.delete(`/budget/categories/${id}/`),
         onSuccess: async () => {
-            console.log('Category deleted successfully, refreshing...');
             // Wait for data to refresh
             await queryClient.invalidateQueries({ queryKey: ['budget-categories', projectId] });
             await queryClient.refetchQueries({ queryKey: ['budget-categories', projectId] });
@@ -290,7 +288,6 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
 
     const saveMonthlyPlanMutation = useMutation({
         mutationFn: async (plan) => {
-            console.log('Sending monthly plan:', plan);
             const promises = Object.entries(plan).map(async ([month, amount]) => {
                 const numericAmount = parseFloat(amount) || 0;
                 const existing = monthlyBudgets.find(mb => mb.month === month);
@@ -852,6 +849,7 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
                                 <MenuItem value="All">All Status</MenuItem>
                                 <MenuItem value="pending">Pending</MenuItem>
                                 <MenuItem value="approved">Approved</MenuItem>
+                                <MenuItem value="rejected">Rejected</MenuItem>
                             </Select>
                         </FormControl>
                         <FormControl size="small" sx={{ minWidth: 140 }}>
@@ -891,7 +889,9 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {filteredExpenses.map((expense) => (
+                            {filteredExpenses.map((expense) => {
+                                const categoryIndex = categories.findIndex(c => c.id === expense.category);
+                                return (
                                 <TableRow key={expense.id} hover sx={{ '&:hover': { bgcolor: '#f8f9fa' } }}>
                                     <TableCell sx={{ fontWeight: 500 }}>{new Date(expense.date).toLocaleDateString()}</TableCell>
                                     <TableCell>
@@ -900,8 +900,8 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
                                             size="small"
                                             sx={{
                                                 fontWeight: 600,
-                                                bgcolor: alpha(COLORS[expense.category % COLORS.length] || '#e0e0e0', 0.1),
-                                                color: COLORS[expense.category % COLORS.length] || 'text.primary'
+                                                bgcolor: alpha(COLORS[categoryIndex] || '#e0e0e0', 0.1),
+                                                color: COLORS[categoryIndex] || 'text.primary'
                                             }}
                                         />
                                     </TableCell>
@@ -910,6 +910,8 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
                                     <TableCell align="center">
                                         {expense.status === 'approved' ? (
                                             <Chip icon={<CheckCircleIcon />} label="Approved" size="small" color="success" variant="outlined" sx={{ fontWeight: 700 }} />
+                                        ) : expense.status === 'rejected' ? (
+                                            <Chip icon={<WarningIcon />} label="Rejected" size="small" color="error" variant="outlined" sx={{ fontWeight: 700 }} />
                                         ) : (
                                             <Chip icon={<WarningIcon />} label="Pending" size="small" color="warning" variant="outlined" sx={{ fontWeight: 700 }} />
                                         )}
@@ -925,7 +927,8 @@ const BudgetTab = ({ projectId: rawProjectId, startDate, endDate }) => {
                                         </Stack>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                                );
+                            })}
                             {filteredExpenses.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
