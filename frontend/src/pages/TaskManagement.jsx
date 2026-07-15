@@ -822,6 +822,7 @@ const TaskManagement = () => {
                 allTasks={tasks}
                 projects={projects}
                 viewMode={viewMode}
+                savePending={saveTaskMutation.isPending}
             />
 
             <DeleteConfirmationModal
