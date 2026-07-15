@@ -252,6 +252,11 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Claude Code local config/state (not version controlled)
+.claude/
+backend/.claude/
+frontend/.claude/
+
 # Local AI memory (not version controlled)
 memory/
 
