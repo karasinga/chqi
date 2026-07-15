@@ -1,6 +1,7 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from .models import Project, ProjectFile, FileFolder, Milestone
 from .serializers import ProjectSerializer, ProjectFileSerializer, FileFolderSerializer, MilestoneSerializer
@@ -10,6 +11,9 @@ class ProjectViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     logging_target_type = 'project'
+
+    def get_permissions(self):
+        return [IsAdminUser()]
 
     def perform_create(self, serializer):
         project = serializer.save(created_by=self.request.user)
@@ -30,6 +34,9 @@ class ProjectViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
 class FileFolderViewSet(viewsets.ModelViewSet):
     queryset = FileFolder.objects.all()
     serializer_class = FileFolderSerializer
+
+    def get_permissions(self):
+        return [IsAdminUser()]
     
     def get_queryset(self):
         queryset = FileFolder.objects.all()
@@ -61,6 +68,9 @@ class FileFolderViewSet(viewsets.ModelViewSet):
 class ProjectFileViewSet(viewsets.ModelViewSet):
     queryset = ProjectFile.objects.all()
     serializer_class = ProjectFileSerializer
+
+    def get_permissions(self):
+        return [IsAdminUser()]
     
     def perform_create(self, serializer):
         serializer.save(uploaded_by=self.request.user)
@@ -82,6 +92,9 @@ class MilestoneViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
     queryset = Milestone.objects.all()
     serializer_class = MilestoneSerializer
     logging_target_type = 'milestone'
+
+    def get_permissions(self):
+        return [IsAdminUser()]
 
     def get_queryset(self):
         queryset = Milestone.objects.all()

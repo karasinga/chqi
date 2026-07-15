@@ -9,7 +9,9 @@ User = get_user_model()
 
 class TaskLoggingTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='testuser', password='password')
+        self.user = User.objects.create_user(
+            username='testuser', password='password', is_staff=True
+        )
         self.project = Project.objects.create(name='Test Project', start_date='2026-01-01')
         self.factory = APIRequestFactory()
 
