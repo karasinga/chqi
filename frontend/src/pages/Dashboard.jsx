@@ -42,6 +42,7 @@ const Dashboard = () => {
     const [endDateFilter, setEndDateFilter] = useState('');
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState(null);
+    const [saveError, setSaveError] = useState(null);
     const [deadlinePeriod, setDeadlinePeriod] = useState('1m');
     const [activityPeriod, setActivityPeriod] = useState('7d'); // ✅ Fix #3: Now used in UI
 
@@ -71,10 +72,20 @@ const Dashboard = () => {
             : api.post('/projects/', projectData),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['projects'] });
+            setSaveError(null);
             setOpenForm(false);
             setEditingProject(null);
         },
-        onError: (err) => console.error(err)
+        onError: (err) => {
+            const detail = err?.response?.data;
+            const msg = typeof detail === 'string'
+                ? detail
+                : detail?.name?.[0]
+                || detail?.end_date?.[0]
+                || detail?.non_field_errors?.[0]
+                || 'Failed to save project.';
+            setSaveError(msg);
+        }
     });
 
     const deleteProjectMutation = useMutation({
@@ -1207,9 +1218,10 @@ const Dashboard = () => {
             {/* Modals */}
             <ProjectForm
                 open={openForm}
-                onClose={() => setOpenForm(false)}
+                onClose={() => { setOpenForm(false); setSaveError(null); }}
                 onSave={handleSave}
                 project={editingProject}
+                error={saveError}
             />
 
             <DeleteConfirmationModal

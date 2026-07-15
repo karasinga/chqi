@@ -11,7 +11,7 @@ class ProjectViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
     logging_target_type = 'project'
 
     def perform_create(self, serializer):
-        project = serializer.save()
+        project = serializer.save(created_by=self.request.user)
         self.log_activity(project, 'create')
 
     def perform_update(self, serializer):

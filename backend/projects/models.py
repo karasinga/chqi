@@ -4,6 +4,11 @@ import uuid
 from django.conf import settings
 
 
+def default_working_days():
+    """Default active weekdays: Monday through Friday (0=Mon … 4=Fri)."""
+    return [0, 1, 2, 3, 4]
+
+
 class Project(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
@@ -13,12 +18,16 @@ class Project(models.Model):
     status = models.CharField(max_length=50, default='active')
     powerbi_embed_url = models.URLField(blank=True, null=True)
     total_budget = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='created_projects'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     # ── Scheduling Calendar Fields ──────────────────────────────────
     # working_days: list of weekday integers (0=Mon … 6=Sun), default Mon-Fri
-    working_days = models.JSONField(default=list, blank=True,
+    working_days = models.JSONField(default=default_working_days, blank=True,
         help_text="Active weekday numbers: 0=Mon 1=Tue 2=Wed 3=Thu 4=Fri 5=Sat 6=Sun")
     hours_per_day = models.IntegerField(default=8,
         help_text="Working hours per day")

@@ -57,6 +57,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     files = ProjectFileSerializer(many=True, read_only=True)
     folders = FileFolderSerializer(many=True, read_only=True)
     milestones = MilestoneSerializer(many=True, read_only=True)
+    created_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -65,7 +66,27 @@ class ProjectSerializer(serializers.ModelSerializer):
             'powerbi_embed_url', 'total_budget',
             # CPM calendar fields
             'working_days', 'hours_per_day', 'holidays',
-            'created_at', 'updated_at',
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
             'files', 'folders', 'milestones',
         ]
+        read_only_fields = ['created_by', 'created_at', 'updated_at']
+
+    def validate_name(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Project name is required.")
+        return value.strip()
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.get_full_name() or obj.created_by.username
+        return None
+
+    def validate(self, attrs):
+        start = attrs.get('start_date')
+        end = attrs.get('end_date')
+        if start and end and end < start:
+            raise serializers.ValidationError(
+                {"end_date": "End date must be on or after the start date."}
+            )
+        return attrs
 
