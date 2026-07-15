@@ -2,7 +2,7 @@ from datetime import timedelta
 import logging
 from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from .models import Task, TaskComment, ActivityLog, Dependency, Notification
 from .serializers import TaskSerializer, TaskCommentSerializer, ActivityLogSerializer, DependencySerializer
@@ -16,6 +16,9 @@ class TaskViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     logging_target_type = 'task'
+
+    def get_permissions(self):
+        return [IsAdminUser()]
 
     def get_queryset(self):
         from django.db.models import Count
@@ -332,6 +335,9 @@ class DependencyViewSet(viewsets.ModelViewSet):
     queryset = Dependency.objects.all()
     serializer_class = DependencySerializer
 
+    def get_permissions(self):
+        return [IsAdminUser()]
+
     def get_queryset(self):
         qs = super().get_queryset()
         project_id = self.request.query_params.get('project_id')
@@ -364,6 +370,9 @@ class TaskCommentViewSet(ActivityLoggingMixin, viewsets.ModelViewSet):
     queryset = TaskComment.objects.all()
     serializer_class = TaskCommentSerializer
     logging_target_type = 'task'
+
+    def get_permissions(self):
+        return [IsAdminUser()]
 
     def get_queryset(self):
         queryset = TaskComment.objects.all()
