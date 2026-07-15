@@ -252,6 +252,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Local AI memory (not version controlled)
+memory/
+
 # Python (if backend exists)
 __pycache__/
 venv/
