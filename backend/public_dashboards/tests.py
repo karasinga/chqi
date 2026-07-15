@@ -76,9 +76,18 @@ class PowerBIDashboardAdminAuthTest(TestCase):
 
     def setUp(self):
         cache.clear()
-        self.user = User.objects.create_user(username='admin', password='pw')
+        self.user = User.objects.create_user(
+            username='admin', password='pw', is_staff=True
+        )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
+
+    def test_non_staff_user_rejected(self):
+        member = User.objects.create_user(username='member', password='pw')
+        client = APIClient()
+        client.force_authenticate(user=member)
+        res = client.get(reverse('public-dashboard-admin-list'))
+        self.assertEqual(res.status_code, 403)
 
     def tearDown(self):
         cache.clear()
