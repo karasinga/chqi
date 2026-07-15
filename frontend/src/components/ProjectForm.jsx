@@ -1,22 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, Button, MenuItem
+    TextField, Button, MenuItem, Alert, Typography
 } from '@mui/material';
+import { useAuth } from '../context/AuthContext';
 
-const ProjectForm = ({ open, onClose, onSave, project }) => {
+const EDITABLE_FIELDS = [
+    'name', 'description', 'start_date', 'end_date', 'status',
+    'powerbi_embed_url', 'total_budget'
+];
+
+const ProjectForm = ({ open, onClose, onSave, project, error }) => {
+    const { user } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
         description: '',
         start_date: '',
         end_date: '',
         status: 'active',
-        powerbi_embed_url: ''
+        powerbi_embed_url: '',
+        total_budget: ''
     });
+    const [localError, setLocalError] = useState('');
 
     useEffect(() => {
         if (project) {
-            setFormData(project);
+            const cleaned = {};
+            EDITABLE_FIELDS.forEach((f) => { cleaned[f] = project[f] ?? ''; });
+            setFormData(cleaned);
         } else {
             setFormData({
                 name: '',
@@ -24,9 +35,11 @@ const ProjectForm = ({ open, onClose, onSave, project }) => {
                 start_date: '',
                 end_date: '',
                 status: 'active',
-                powerbi_embed_url: ''
+                powerbi_embed_url: '',
+                total_budget: ''
             });
         }
+        setLocalError('');
     }, [project]);
 
     const handleChange = (e) => {
@@ -34,6 +47,16 @@ const ProjectForm = ({ open, onClose, onSave, project }) => {
     };
 
     const handleSubmit = () => {
+        if (!formData.name || !formData.name.trim()) {
+            setLocalError('Project name is required.');
+            return;
+        }
+        if (formData.start_date && formData.end_date
+            && formData.end_date < formData.start_date) {
+            setLocalError('End date must be on or after the start date.');
+            return;
+        }
+        setLocalError('');
         onSave(formData);
     };
 
@@ -41,6 +64,14 @@ const ProjectForm = ({ open, onClose, onSave, project }) => {
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>{project ? 'Edit Project' : 'New Project'}</DialogTitle>
             <DialogContent>
+                <Typography variant="caption" color="text.secondary">
+                    Owner: {project?.created_by_name || user?.username || '—'}
+                </Typography>
+                {(localError || error) && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                        {localError || error}
+                    </Alert>
+                )}
                 <TextField
                     autoFocus
                     margin="dense"
@@ -49,6 +80,7 @@ const ProjectForm = ({ open, onClose, onSave, project }) => {
                     fullWidth
                     value={formData.name}
                     onChange={handleChange}
+                    error={!!localError}
                 />
                 <TextField
                     margin="dense"
@@ -99,6 +131,16 @@ const ProjectForm = ({ open, onClose, onSave, project }) => {
                     label="Analytics Dashboard URL"
                     fullWidth
                     value={formData.powerbi_embed_url || ''}
+                    onChange={handleChange}
+                />
+                <TextField
+                    margin="dense"
+                    name="total_budget"
+                    label="Total Budget"
+                    type="number"
+                    fullWidth
+                    InputProps={{ inputProps: { min: 0, step: '0.01' } }}
+                    value={formData.total_budget ?? ''}
                     onChange={handleChange}
                 />
             </DialogContent>
