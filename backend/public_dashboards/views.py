@@ -1,6 +1,6 @@
 from django.views.decorators.cache import cache_page
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.viewsets import ModelViewSet
@@ -45,4 +45,4 @@ class PowerBIDashboardViewSet(ModelViewSet):
     serializer_class = PowerBIDashboardAdminSerializer
 
     def get_permissions(self):
-        return [IsAuthenticated()]
+        return [IsAdminUser()]
