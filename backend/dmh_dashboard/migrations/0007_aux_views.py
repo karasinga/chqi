@@ -1,4 +1,16 @@
-from django.db import migrations
+from django.db import connection, migrations
+
+
+# These views use Postgres-only syntax (CREATE OR REPLACE VIEW, CASCADE).
+# On non-Postgres backends (e.g. SQLite dev) they are skipped.
+def _is_postgres():
+    try:
+        return connection.vendor == 'postgresql'
+    except Exception:
+        return False
+
+
+_RUN_ON_POSTGRES = _is_postgres()
 
 
 VIEWS_SQL = [
@@ -141,4 +153,4 @@ class Migration(migrations.Migration):
             sql="\n".join(forward for forward, _ in VIEWS_SQL),
             reverse_sql="\n".join(reverse for _, reverse in VIEWS_SQL),
         )
-    ]
+    ] if _RUN_ON_POSTGRES else []

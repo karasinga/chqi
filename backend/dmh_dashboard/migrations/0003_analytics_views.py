@@ -1,4 +1,16 @@
-from django.db import migrations
+from django.db import connection, migrations
+
+
+# These views use Postgres-only syntax (CREATE OR REPLACE VIEW, ::bigint casts).
+# On non-Postgres backends (e.g. SQLite dev) they are skipped.
+def _is_postgres():
+    try:
+        return connection.vendor == 'postgresql'
+    except Exception:
+        return False
+
+
+_RUN_ON_POSTGRES = _is_postgres()
 
 # Reusable SQL template — one view per analytics profile.
 VIEW_TEMPLATE = """
@@ -49,4 +61,4 @@ class Migration(migrations.Migration):
                 for v, _ in ANALYTICS_VIEWS
             ),
         ),
-    ]
+    ] if _RUN_ON_POSTGRES else []

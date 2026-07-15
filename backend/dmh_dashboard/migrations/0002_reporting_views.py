@@ -16,7 +16,20 @@ Why views and not direct table access:
 The view is filtered by profile, so each Fact_ReportingCompliance_* table
 points at its own view, mirroring the old one-CSV-per-form layout.
 """
-from django.db import migrations
+from django.db import connection, migrations
+
+
+# These views use Postgres-only syntax (CREATE OR REPLACE VIEW, ::bigint casts).
+# On non-Postgres backends (e.g. SQLite dev) they are skipped — the views are a
+# Power BI compatibility layer not needed for local development.
+def _is_postgres():
+    try:
+        return connection.vendor == 'postgresql'
+    except Exception:
+        return False
+
+
+_RUN_ON_POSTGRES = _is_postgres()
 
 
 # Reusable SQL template — one view per reporting profile.
@@ -70,4 +83,4 @@ class Migration(migrations.Migration):
                 for v, _ in REPORTING_VIEWS
             ),
         ),
-    ]
+    ] if _RUN_ON_POSTGRES else []
