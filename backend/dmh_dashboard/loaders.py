@@ -16,7 +16,7 @@ import pandas as pd
 from django.db import transaction
 from django.utils import timezone
 
-from .models import DmhAnalyticsFact, DmhReportingFact, DmhRefreshLog
+from .models import DmhAnalyticsFact, DmhFacilityHierarchy, DmhReportingFact, DmhRefreshLog
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,21 @@ REPORTING_MAP = {
 
 # read_csv dtype override — keeps DHIS2 dirty Value as text verbatim.
 READ_CSV_DTYPE = {'Value': str}
+
+# Hierarchy CSV column -> model field
+HIERARCHY_MAP = {
+    'OrgUnit_ID': 'org_unit_id',
+    'OrgUnit_Code': 'org_unit_code',
+    'Facility': 'facility',
+    'Country': 'country',
+    'Country_Code': 'country_code',
+    'County': 'county',
+    'County_Code': 'county_code',
+    'SubCounty': 'subcounty',
+    'SubCounty_Code': 'subcounty_code',
+    'Ward': 'ward',
+    'Ward_Code': 'ward_code',
+}
 
 
 def _clean_df(df):
@@ -108,6 +123,39 @@ def upsert_analytics(df, profile, as_of_date, log=None, chunksize=5000):
     return total
 
 
+def _records_hierarchy(df, mapping):
+    """Like _records but no profile/as_of_date — reference data."""
+    renamed = df[list(mapping.keys())].rename(columns=mapping)
+    recs = renamed.to_dict('records')
+    for r in recs:
+        for k, v in r.items():
+            if v is None:
+                r[k] = ''
+    return recs
+
+
+def upsert_facility_hierarchy(df, chunksize=5000):
+    """Upsert facility hierarchy rows. Idempotent — re-run updates in place."""
+    df = _clean_df(df)
+    recs = _records_hierarchy(df, HIERARCHY_MAP)
+    total = 0
+    for i in range(0, len(recs), chunksize):
+        chunk = [DmhFacilityHierarchy(**r) for r in recs[i:i + chunksize]]
+        with transaction.atomic():
+            DmhFacilityHierarchy.objects.bulk_create(
+                chunk,
+                update_conflicts=True,
+                unique_fields=['org_unit_id'],
+                update_fields=[
+                    'org_unit_code', 'facility', 'country', 'country_code',
+                    'county', 'county_code', 'subcounty', 'subcounty_code',
+                    'ward', 'ward_code',
+                ],
+            )
+        total += len(chunk)
+    return total
+
+
 def upsert_reporting(df, profile, as_of_date, log=None, chunksize=5000):
     """Upsert reporting-rate rows. Updates refresh log if provided."""
     df = _clean_df(df)
@@ -134,4 +182,37 @@ def upsert_reporting(df, profile, as_of_date, log=None, chunksize=5000):
         log.status = 'success'
         log.completed_at = timezone.now()
         log.save()
+    return total
+
+
+def _records_hierarchy(df, mapping):
+    """Like _records but no profile/as_of_date — reference data."""
+    renamed = df[list(mapping.keys())].rename(columns=mapping)
+    recs = renamed.to_dict('records')
+    for r in recs:
+        for k, v in r.items():
+            if v is None:
+                r[k] = ''
+    return recs
+
+
+def upsert_facility_hierarchy(df, chunksize=5000):
+    """Upsert facility hierarchy rows. Idempotent — re-run updates in place."""
+    df = _clean_df(df)
+    recs = _records_hierarchy(df, HIERARCHY_MAP)
+    total = 0
+    for i in range(0, len(recs), chunksize):
+        chunk = [DmhFacilityHierarchy(**r) for r in recs[i:i + chunksize]]
+        with transaction.atomic():
+            DmhFacilityHierarchy.objects.bulk_create(
+                chunk,
+                update_conflicts=True,
+                unique_fields=['org_unit_id'],
+                update_fields=[
+                    'org_unit_code', 'facility', 'country', 'country_code',
+                    'county', 'county_code', 'subcounty', 'subcounty_code',
+                    'ward', 'ward_code',
+                ],
+            )
+        total += len(chunk)
     return total

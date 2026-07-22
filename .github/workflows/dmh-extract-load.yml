@@ -70,6 +70,9 @@ jobs:
       - name: Show extracted files
         run: find outputs -name '*.csv' -printf '%p  %s bytes\n' | sort
 
+      - name: Stage hierarchy CSV
+        run: cp dashboard/backend/dmh_dashboard/data/hierarchy_facility_with_code.csv outputs/
+
       - name: Install dashboard deps
         run: pip install -r dashboard/backend/requirements.txt
 
@@ -78,4 +81,6 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           USE_SQLITE: 'false'
         working-directory: dashboard/backend
-        run: python manage.py load_dmh_csvs --dir ../../outputs --trigger cron
+        run: |
+          python manage.py load_dmh_csvs --dir ../../outputs --trigger cron
+          python manage.py load_dmh_hierarchy --file ../../outputs/hierarchy_facility_with_code.csv
