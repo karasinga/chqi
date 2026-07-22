@@ -218,3 +218,25 @@ class DmhCuFacilityMapping(models.Model):
 
     def __str__(self):
         return f"{self.community_unit_name} -> {self.facility_name}"
+
+
+class DmhFacilityHierarchy(models.Model):
+    """Facility demographics with geo hierarchy codes.
+
+    Upserted via load_dmh_hierarchy management command. org_unit_id is the
+    natural PK — re-running the same CSV updates existing rows in place.
+    """
+    org_unit_id = models.CharField(max_length=50, primary_key=True)
+    org_unit_code = models.CharField(max_length=50, blank=True, default='')
+    facility = models.CharField(max_length=255)
+    country = models.CharField(max_length=100, blank=True, default='')
+    country_code = models.CharField(max_length=10, blank=True, default='')
+    county = models.CharField(max_length=100, blank=True, default='')
+    county_code = models.CharField(max_length=50, blank=True, default='')
+    subcounty = models.CharField(max_length=150, blank=True, default='')
+    subcounty_code = models.CharField(max_length=50, blank=True, default='')
+    ward = models.CharField(max_length=150, blank=True, default='')
+    ward_code = models.CharField(max_length=50, blank=True, default='')
+
+    def __str__(self):
+        return f"{self.facility} ({self.org_unit_id})"

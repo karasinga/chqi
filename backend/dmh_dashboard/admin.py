@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import DmhRefreshLog, DmhAnalyticsFact, DmhReportingFact
+from .models import DmhRefreshLog, DmhAnalyticsFact, DmhFacilityHierarchy, DmhReportingFact
 
 
 @admin.register(DmhRefreshLog)
@@ -29,3 +29,11 @@ class DmhReportingFactAdmin(admin.ModelAdmin):
     search_fields = ('org_unit_id', 'facility', 'county', 'data_element', 'dataset')
     readonly_fields = [f.name for f in DmhReportingFact._meta.fields]
     ordering = ('-as_of_date',)
+
+
+@admin.register(DmhFacilityHierarchy)
+class DmhFacilityHierarchyAdmin(admin.ModelAdmin):
+    list_display = ('org_unit_id', 'facility', 'county', 'subcounty', 'ward')
+    list_filter = ('county',)
+    search_fields = ('org_unit_id', 'facility', 'county')
+    readonly_fields = [f.name for f in DmhFacilityHierarchy._meta.fields]
