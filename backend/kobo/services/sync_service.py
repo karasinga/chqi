@@ -24,7 +24,8 @@ class SyncService:
                 # Determine incremental window (2-day safety net to catch late edits/updates)
                 last_log = SyncLog.objects.filter(status='success').order_by('-finished_at').first()
                 if last_log and last_log.finished_at:
-                    since = (last_log.finished_at - timedelta(days=2)).isoformat()
+                    # Strip timezone suffix — Kobo query parser chokes on +00:00
+                    since = (last_log.finished_at - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%S')
             
             logger.info(f"Starting Kobo data sync. Force full: {force_full}, since: {since}")
             iterator = client.iter_submissions(since=since)

@@ -33,8 +33,11 @@ class KoboClient:
         params = {"limit": 1000}
         
         if since:
-            # CRITICAL: Use _last_modified, not _submission_time
-            params["query"] = f'{{"_last_modified":{{"$gt":"{since}"}}}}'
+            # CRITICAL: Use _submission_time, not _last_modified.
+            # Kobo API does not return _last_modified for this form — a query on it
+            # always returns 0 records, which silently starved both manual and
+            # nightly syncs (and fired nightly "zero records" alerts).
+            params["query"] = f'{{"_submission_time":{{"$gt":"{since}"}}}}'
 
         next_url = url
         while next_url:
